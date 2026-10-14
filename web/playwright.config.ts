@@ -1,6 +1,4 @@
-import { resolve } from 'node:path';
 import { defineConfig } from '@playwright/test';
-process.env.PLAYWRIGHT_BROWSERS_PATH ??= resolve('.cache/ms-playwright');
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,

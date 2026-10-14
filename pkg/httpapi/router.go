@@ -28,11 +28,12 @@ type Events interface {
 }
 
 type Deps struct {
-	Events  Events     // nil when DATABASE_URL is not set
-	Live    *feeds.Hub // public feeds, no database needed
-	Stream  stream.Config
-	Version string
-	Log     *slog.Logger
+	Events    Events     // nil when DATABASE_URL is not set
+	Live      *feeds.Hub // public feeds, no database needed
+	GeoStatus string     // "ok", or why the DB-IP files could not be opened
+	Stream    stream.Config
+	Version   string
+	Log       *slog.Logger
 }
 
 func NewRouter(d Deps) http.Handler {
@@ -89,7 +90,9 @@ func (d Deps) healthz(w http.ResponseWriter, r *http.Request) {
 			status = "down"
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "db": status, "version": d.Version})
+	writeJSON(w, http.StatusOK, map[string]string{
+		"status": "ok", "db": status, "geo": d.GeoStatus, "version": d.Version,
+	})
 }
 
 type eventsPage struct {

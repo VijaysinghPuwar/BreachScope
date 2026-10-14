@@ -3,10 +3,12 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/VijaysinghPuwar/BreachScope/pkg/config"
@@ -30,9 +32,11 @@ func Build(ctx context.Context, cfg config.Config, log *slog.Logger) (http.Handl
 	deps.Stream.MaxDuration = cfg.StreamMaxDuration
 
 	geo, err := openGeo(cfg.GeoIPDir)
+	deps.GeoStatus = "ok"
 	if err != nil {
 		// The feeds still work without it; events just carry no location.
 		log.Warn("geoip unavailable, events will not be located", "err", err)
+		deps.GeoStatus = "missing: " + err.Error()
 	}
 	deps.Live = feeds.NewHub(feeds.Default(), &http.Client{Timeout: 30 * time.Second}, geo, log)
 
@@ -56,7 +60,7 @@ func openGeo(dir string) (*geoip.DB, error) {
 	if exe, err := os.Executable(); err == nil {
 		candidates = append(candidates, filepath.Join(filepath.Dir(exe), "geo"))
 	}
-	var firstErr error
+	var tried []string
 	for _, c := range candidates {
 		if c == "" {
 			continue
@@ -65,9 +69,8 @@ func openGeo(dir string) (*geoip.DB, error) {
 		if err == nil {
 			return db, nil
 		}
-		if firstErr == nil {
-			firstErr = err
-		}
+		abs, _ := filepath.Abs(c)
+		tried = append(tried, abs)
 	}
-	return nil, firstErr
+	return nil, fmt.Errorf("DB-IP files not found in %s", strings.Join(tried, ", "))
 }

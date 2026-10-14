@@ -2,7 +2,6 @@ import { execFileSync } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { geoArea, geoCentroid, geoEquirectangular } from 'd3-geo';
 import { geoProject } from 'd3-geo-projection';
 
@@ -12,7 +11,6 @@ import { geoProject } from 'd3-geo-projection';
 // equirectangular projection scaled to degrees makes d3 cut every shape at the
 // antimeridian; flipping y back gives plain lon/lat that MapLibre draws cleanly
 // in both Mercator and globe.
-const webDir = fileURLToPath(new URL('..', import.meta.url));
 
 const toDegrees = geoEquirectangular()
   .scale(180 / Math.PI)
@@ -61,7 +59,9 @@ if (!response.ok) throw new Error(`Natural Earth download failed: ${response.sta
 await writeFile(source, Buffer.from(await response.arrayBuffer()));
 
 const shaper = (args) =>
-  execFileSync(join(webDir, 'node_modules/.bin/mapshaper'), args, { stdio: 'inherit' });
+  // Fetched on demand: only this script needs it, and keeping it out of
+  // package.json keeps its native dependencies out of every install.
+  execFileSync('npx', ['--yes', 'mapshaper@0.6.121', ...args], { stdio: 'inherit' });
 const simplified = join(work, 'countries.geojson');
 const dissolved = join(work, 'land.geojson');
 shaper([
