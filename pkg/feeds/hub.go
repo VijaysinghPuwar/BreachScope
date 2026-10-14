@@ -9,8 +9,11 @@
 package feeds
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -77,6 +80,13 @@ type Hub struct {
 	mu      sync.Mutex
 	state   map[string]*sourceState
 	refresh chan struct{} // non-nil while a refresh is running
+
+	// The encoded snapshot is cached and rebuilt only when a refresh changes
+	// something. Encoding 2,000+ events per request was the bottleneck under
+	// load (about 60 requests a second); serving cached bytes is not.
+	version        uint64 // bumped whenever any source's data or status changes
+	encoded        *Encoded
+	encodedVersion uint64
 }
 
 func NewHub(sources []Source, client *http.Client, geo *geoip.DB, log *slog.Logger) *Hub {
@@ -167,6 +177,7 @@ func (h *Hub) runRefresh(done chan struct{}) {
 	wg.Wait()
 
 	h.mu.Lock()
+	h.version++
 	h.refresh = nil
 	h.mu.Unlock()
 	close(done)
@@ -175,7 +186,11 @@ func (h *Hub) runRefresh(done chan struct{}) {
 func (h *Hub) build() Snapshot {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	snap := Snapshot{GeneratedAt: h.now().UTC(), Events: []store.Event{}}
+	return h.buildLocked()
+}
+
+func (h *Hub) buildLocked() Snapshot {
+	snap := Snapshot{GeneratedAt: h.lastRefresh().UTC(), Events: []store.Event{}}
 	for _, s := range h.sources {
 		st := h.state[s.Name]
 		ss := SourceStatus{
@@ -217,4 +232,52 @@ func uid(source, id string) string {
 	sum[6] = (sum[6] & 0x0f) | 0x50 // version 5 style, name-based
 	sum[8] = (sum[8] & 0x3f) | 0x80 // RFC 4122 variant
 	return fmt.Sprintf("%x-%x-%x-%x-%x", sum[0:4], sum[4:6], sum[6:8], sum[8:10], sum[10:16])
+}
+
+// lastRefresh is the newest successful fetch time, so generated_at describes
+// the data rather than the moment a response happened to be built.
+func (h *Hub) lastRefresh() time.Time {
+	var t time.Time
+	for _, st := range h.state {
+		if st.lastSuccess.After(t) {
+			t = st.lastSuccess
+		}
+	}
+	if t.IsZero() {
+		t = h.now()
+	}
+	return t
+}
+
+// Encoded is a snapshot ready to send: JSON, its gzip form and an ETag.
+type Encoded struct {
+	JSON []byte
+	Gzip []byte
+	ETag string
+}
+
+// EncodedSnapshot is Snapshot, encoded once per data change and cached.
+func (h *Hub) EncodedSnapshot(ctx context.Context) (*Encoded, error) {
+	h.Snapshot(ctx) // triggers a refresh when a source is due
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.encoded != nil && h.encodedVersion == h.version {
+		return h.encoded, nil
+	}
+	body, err := json.Marshal(h.buildLocked())
+	if err != nil {
+		return nil, err
+	}
+	var buf bytes.Buffer
+	zw, _ := gzip.NewWriterLevel(&buf, gzip.BestSpeed)
+	if _, err := zw.Write(body); err != nil {
+		return nil, err
+	}
+	if err := zw.Close(); err != nil {
+		return nil, err
+	}
+	sum := sha256.Sum256(body)
+	h.encoded = &Encoded{JSON: body, Gzip: buf.Bytes(), ETag: fmt.Sprintf(`"%x"`, sum[:12])}
+	h.encodedVersion = h.version
+	return h.encoded, nil
 }

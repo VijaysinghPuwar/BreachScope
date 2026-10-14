@@ -217,3 +217,20 @@ func TestHubIsPoliteToFeeds(t *testing.T) {
 		t.Fatalf("after 429: events=%d err=%q", len(s.Events), s.Sources[0].LastError)
 	}
 }
+
+func TestParseHIBP(t *testing.T) {
+	m := byID(must(parseHIBP(fixture(t, "hibp.json"), nil, testNow)))
+	if len(m) != 2 {
+		t.Fatalf("kept %d breaches, want 2 (fabricated, spam and old dropped)", len(m))
+	}
+	cb := m["Crunchbase"]
+	if cb.DataClass != "breach_report" || cb.Severity != 2 || cb.Attrs["records"] != 559908 || *cb.Confidence != 100 {
+		t.Errorf("crunchbase: %+v", cb)
+	}
+	if cb.SrcLat != nil || cb.GeoMethod != geoip.MethodNone {
+		t.Error("a breach must not be placed on the map")
+	}
+	if bank := m["BankCo"]; bank.Severity != 4 || *bank.Confidence != 50 {
+		t.Errorf("leaked passwords should be critical and unverified should be 50: %+v", bank)
+	}
+}

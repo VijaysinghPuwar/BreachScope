@@ -1,0 +1,7 @@
+[
+ {"Name":"Crunchbase","Title":"Crunchbase","Domain":"crunchbase.com","BreachDate":"2026-01-22","AddedDate":"2026-10-14T06:01:26Z","PwnCount":559908,"DataClasses":["Email addresses","Names"],"IsVerified":true,"IsFabricated":false,"IsSpamList":false,"IsSensitive":false,"DisclosureUrl":""},
+ {"Name":"BankCo","Title":"BankCo","Domain":"bank.example","BreachDate":"2026-09-01","AddedDate":"2026-10-01T00:00:00Z","PwnCount":5000,"DataClasses":["Email addresses","Passwords"],"IsVerified":false,"IsFabricated":false,"IsSpamList":false,"IsSensitive":false},
+ {"Name":"Fake","Title":"Fake","Domain":"fake.example","BreachDate":"2026-09-01","AddedDate":"2026-10-01T00:00:00Z","PwnCount":5000,"DataClasses":[],"IsVerified":false,"IsFabricated":true,"IsSpamList":false,"IsSensitive":false},
+ {"Name":"Spam","Title":"Spam","Domain":"spam.example","BreachDate":"2026-09-01","AddedDate":"2026-10-01T00:00:00Z","PwnCount":5000,"DataClasses":[],"IsVerified":false,"IsFabricated":false,"IsSpamList":true,"IsSensitive":false},
+ {"Name":"Old","Title":"Old","Domain":"old.example","BreachDate":"2019-01-01","AddedDate":"2019-02-01T00:00:00Z","PwnCount":5000000,"DataClasses":[],"IsVerified":true,"IsFabricated":false,"IsSpamList":false,"IsSensitive":false}
+]

@@ -8,9 +8,11 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
+	"github.com/VijaysinghPuwar/BreachScope/pkg/feeds"
 	"github.com/VijaysinghPuwar/BreachScope/pkg/store"
 	"github.com/VijaysinghPuwar/BreachScope/pkg/stream"
 )
@@ -140,5 +142,53 @@ func TestSSETestTicksAndCloses(t *testing.T) {
 	})
 	if ticks < 1 || !closed {
 		t.Fatalf("ticks=%d closed=%v", ticks, closed)
+	}
+}
+
+func TestLiveServesCachedGzipWithETag(t *testing.T) {
+	body, err := os.ReadFile("../feeds/testdata/feodo.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var upstream int
+	feed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upstream++
+		_, _ = w.Write(body)
+	}))
+	defer feed.Close()
+
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	hub := feeds.NewHub([]feeds.Source{{
+		Name: "Feodo Tracker", DataClass: "indicator", Licence: "CC0", FeedURL: feed.URL,
+		MinInterval: time.Hour, Parse: feeds.ParseFeodo,
+	}}, feed.Client(), nil, log)
+	h := NewRouter(Deps{Live: hub, Stream: stream.DefaultConfig(), Log: log})
+
+	get := func(header, value string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodGet, "/api/live", nil)
+		if header != "" {
+			req.Header.Set(header, value)
+		}
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		return rec
+	}
+
+	plain := get("", "")
+	var snap feeds.Snapshot
+	if plain.Code != 200 || json.Unmarshal(plain.Body.Bytes(), &snap) != nil || len(snap.Events) != 1 {
+		t.Fatalf("plain response: %d %s", plain.Code, plain.Body.String())
+	}
+	etag := plain.Header().Get("ETag")
+
+	zipped := get("Accept-Encoding", "gzip, br")
+	if zipped.Header().Get("Content-Encoding") != "gzip" || zipped.Body.Len() >= plain.Body.Len() {
+		t.Fatalf("expected a smaller gzip body, got %q %d bytes", zipped.Header().Get("Content-Encoding"), zipped.Body.Len())
+	}
+	if again := get("If-None-Match", etag); again.Code != http.StatusNotModified || again.Body.Len() != 0 {
+		t.Fatalf("matching ETag: %d with %d bytes", again.Code, again.Body.Len())
+	}
+	if upstream != 1 {
+		t.Fatalf("%d upstream fetches for 3 requests, want 1", upstream)
 	}
 }

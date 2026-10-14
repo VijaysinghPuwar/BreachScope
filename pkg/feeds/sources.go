@@ -52,6 +52,11 @@ func Default() []Source {
 			FeedURL:     "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
 			MinInterval: time.Hour, Parse: parseKEV,
 		},
+		{
+			Name: "Have I Been Pwned", DataClass: "breach_report", Licence: "CC BY 4.0 (haveibeenpwned.com)",
+			URL: "https://haveibeenpwned.com/PwnedWebsites", FeedURL: "https://haveibeenpwned.com/api/v3/breaches",
+			MinInterval: time.Hour, Parse: parseHIBP,
+		},
 	}
 }
 
@@ -225,6 +230,9 @@ func parseURLhaus(body []byte, geo *geoip.DB, now time.Time) ([]store.Event, err
 	return keepRecent(evs, now), nil
 }
 
+// ParseFeodo is exported for tests that need a real parser.
+var ParseFeodo = parseFeodo
+
 func parseFeodo(body []byte, geo *geoip.DB, now time.Time) ([]store.Event, error) {
 	src := Default()[2]
 	var raw []struct {
@@ -353,4 +361,80 @@ func parseKEV(body []byte, _ *geoip.DB, now time.Time) ([]store.Event, error) {
 		evs = append(evs, e)
 	}
 	return evs, nil
+}
+
+// breachWindow is how far back breach disclosures are shown. They arrive a few
+// times a week, so 90 days keeps the list useful without the whole catalogue.
+const breachWindow = 90 * 24 * time.Hour
+
+func parseHIBP(body []byte, _ *geoip.DB, now time.Time) ([]store.Event, error) {
+	src := Default()[5]
+	var raw []struct {
+		Name          string   `json:"Name"`
+		Title         string   `json:"Title"`
+		Domain        string   `json:"Domain"`
+		BreachDate    string   `json:"BreachDate"`
+		AddedDate     string   `json:"AddedDate"`
+		PwnCount      int      `json:"PwnCount"`
+		DataClasses   []string `json:"DataClasses"`
+		IsVerified    bool     `json:"IsVerified"`
+		IsFabricated  bool     `json:"IsFabricated"`
+		IsSpamList    bool     `json:"IsSpamList"`
+		IsSensitive   bool     `json:"IsSensitive"`
+		IsStealerLog  bool     `json:"IsStealerLog"`
+		DisclosureURL string   `json:"DisclosureUrl"`
+	}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, err
+	}
+	var evs []store.Event
+	for _, b := range raw {
+		added := parseTime(time.RFC3339, b.AddedDate)
+		// Fabricated breaches and spam lists are not breaches of the named
+		// organisation, and sensitive breaches are hidden by HIBP itself.
+		if added == nil || now.Sub(*added) > breachWindow || b.IsFabricated || b.IsSpamList || b.IsSensitive {
+			continue
+		}
+		e := base(src, b.Name, now)
+		e.ReportedAt = added
+		e.Category, e.CategoryLabel = "breach_disclosure", "Data breach"
+		e.Severity = breachSeverity(b.PwnCount, b.DataClasses)
+		if b.IsVerified {
+			e.Confidence = ptr[int16](100)
+			e.ConfidenceBasis = "Verified by Have I Been Pwned"
+		} else {
+			e.Confidence = ptr[int16](50)
+			e.ConfidenceBasis = "Listed by Have I Been Pwned, not verified"
+		}
+		e.Attrs["organisation"] = b.Title
+		e.Attrs["domain"] = b.Domain
+		e.Attrs["breach_date"] = b.BreachDate
+		e.Attrs["records"] = b.PwnCount
+		e.Attrs["data_types"] = strings.Join(b.DataClasses, ", ")
+		e.Attrs["verified"] = b.IsVerified
+		if b.DisclosureURL != "" {
+			e.Attrs["disclosure_url"] = b.DisclosureURL
+		}
+		evs = append(evs, e)
+	}
+	return evs, nil
+}
+
+// breachSeverity ranks a breach by size and by what leaked. Passwords and
+// financial data raise it regardless of size.
+func breachSeverity(records int, dataClasses []string) int16 {
+	for _, c := range dataClasses {
+		switch c {
+		case "Passwords", "Bank account numbers", "Credit cards", "Partial credit card data", "Government issued IDs", "Social security numbers":
+			return 4
+		}
+	}
+	switch {
+	case records >= 1_000_000:
+		return 3
+	case records >= 100_000:
+		return 2
+	default:
+		return 1
+	}
 }

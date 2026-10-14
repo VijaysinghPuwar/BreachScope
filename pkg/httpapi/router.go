@@ -217,7 +217,26 @@ func (d Deps) live(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 40*time.Second)
 	defer cancel()
-	snap := d.Live.Snapshot(ctx)
-	w.Header().Set("Cache-Control", "public, max-age=30, s-maxage=120, stale-while-revalidate=600")
-	writeJSON(w, http.StatusOK, snap)
+	enc, err := d.Live.EncodedSnapshot(ctx)
+	if err != nil {
+		d.Log.Error("encode live snapshot", "err", err)
+		writeError(w, r, http.StatusInternalServerError, "could not build snapshot")
+		return
+	}
+	h := w.Header()
+	h.Set("Cache-Control", "public, max-age=30, s-maxage=120, stale-while-revalidate=600")
+	h.Set("ETag", enc.ETag)
+	h.Set("Vary", "Accept-Encoding")
+	if r.Header.Get("If-None-Match") == enc.ETag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	h.Set("Content-Type", "application/json")
+	body := enc.JSON
+	if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+		h.Set("Content-Encoding", "gzip")
+		body = enc.Gzip
+	}
+	h.Set("Content-Length", strconv.Itoa(len(body)))
+	_, _ = w.Write(body)
 }
