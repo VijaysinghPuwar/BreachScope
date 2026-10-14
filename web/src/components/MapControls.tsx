@@ -1,5 +1,5 @@
 import { useSample } from '../lib/api';
-import { Layers as LayersIcon, Minus, Plus, RotateCcw } from 'lucide-react';
+import { Layers as LayersIcon, Minus, Orbit, Plus, RotateCcw } from 'lucide-react';
 import { dataClasses, classNames, type DataClass } from '../data/events';
 import { layerDefinitions, type Layers, type MapActions, type Projection } from '../map/types';
 import { Button, Chip, PopoverPanel, SegmentedControl } from './ui';
@@ -31,6 +31,7 @@ export function MapControls({
   mobile,
   classes,
   onToggleClass,
+  onSpace,
 }: {
   projection: Projection;
   onProjection(value: Projection): void;
@@ -40,6 +41,7 @@ export function MapControls({
   mobile: boolean;
   classes: DataClass[];
   onToggleClass(code: DataClass): void;
+  onSpace(): void;
 }) {
   return (
     <div className="map-controls" aria-label="Map controls">
@@ -112,6 +114,9 @@ export function MapControls({
           onClick={() => actions?.reset()}
         >
           <RotateCcw />
+        </Button>
+        <Button iconOnly aria-label="Zoom out to space" title="Zoom out to space" onClick={onSpace}>
+          <Orbit />
         </Button>
       </div>
     </div>

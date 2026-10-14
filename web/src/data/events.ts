@@ -5,7 +5,7 @@ export type Position = [number, number];
 import type { LiveEvent } from './live';
 export interface Observation {
   raw?: LiveEvent;
-  attrs?: Record<string, string | number>;
+  attrs?: Record<string, string | number | boolean>;
   seq: number;
   event_uid: string;
   data_class: DataClass;

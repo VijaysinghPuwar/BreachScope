@@ -30,7 +30,7 @@ export interface LiveEvent {
   src_lon?: number;
   geo_method: 'dbip_city_lite' | 'dbip_country' | 'feed_country' | 'none';
   geo_accuracy_km?: number;
-  attrs?: Record<string, string | number>;
+  attrs?: Record<string, string | number | boolean>;
 }
 export interface LiveSource {
   name: string;
@@ -59,12 +59,13 @@ export function toObservation(raw: LiveEvent): Observation {
     data_class: classCodes[raw.data_class],
     severity: raw.severity,
     category: raw.category_label || raw.category,
-    src: raw.src_ip ?? String(raw.attrs?.cve ?? raw.attrs?.url ?? ''),
+    src: raw.src_ip ?? String(raw.attrs?.cve ?? raw.attrs?.url ?? raw.attrs?.organisation ?? ''),
     asn: raw.src_asn === undefined ? null : `AS${raw.src_asn}`,
     country: country ? String(raw.attrs?.country_name ?? countries.of(country)) : null,
     country_code: country ?? null,
     coordinates:
       raw.data_class !== 'vulnerability' &&
+      raw.data_class !== 'breach_report' &&
       raw.geo_method === 'dbip_city_lite' &&
       Number.isFinite(raw.src_lat) &&
       Number.isFinite(raw.src_lon)

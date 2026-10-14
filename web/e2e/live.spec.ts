@@ -24,7 +24,10 @@ for (const [width, height] of sizes)
         });
         await page.goto('/');
         await expect(page.getByText('Live · 0 new in last poll · updated 0s ago')).toBeVisible();
-        await expect(page.getByTestId('map-canvas')).toHaveAttribute('data-ready', 'true');
+        await expect(page.getByTestId('map-canvas')).toHaveAttribute('data-ready', 'true', {
+          // CI renders WebGL in software and fetches the tile index first.
+          timeout: 30_000,
+        });
         await page.getByRole('radio', { name: projection, exact: true }).click();
         await expect(page.getByTestId('map-canvas')).toHaveAttribute('data-projection', projection);
         await expect(
@@ -40,7 +43,7 @@ for (const [width, height] of sizes)
         expect(
           await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
         ).toBe(true);
-        if (width >= 768 && width < 1280)
+        if (width >= 768)
           await page.getByRole('button', { name: 'Open feed', exact: true }).click();
         if (width < 768) {
           await page.getByRole('button', { name: 'Search events', exact: true }).click();
@@ -85,6 +88,9 @@ test('first-load error shows request ID and Retry recovers without sample data',
   await expect(page.getByText('Sample data. Live feeds are not connected yet.')).toHaveCount(0);
   fail = false;
   await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  // The console opens map-first; the feed is one click away.
+  const openFeed = page.getByRole('button', { name: 'Open feed', exact: true });
+  if (await openFeed.isVisible()) await openFeed.click();
   await expect(page.locator('.feed-row')).toHaveCount(18);
 });
 test('search, class filters, missing accuracy, KEV details and new UID accent', async ({
@@ -105,6 +111,9 @@ test('search, class filters, missing accuracy, KEV details and new UID accent', 
     }),
   );
   await page.goto('/');
+  // The console opens map-first; the feed is one click away.
+  const openFeed = page.getByRole('button', { name: 'Open feed', exact: true });
+  if (await openFeed.isVisible()) await openFeed.click();
   await expect(page.locator('.feed-row')).toHaveCount(18);
   await page.clock.fastForward(60000);
   await expect(page.locator('[data-uid="new-event"]')).toHaveClass(/is-new/);

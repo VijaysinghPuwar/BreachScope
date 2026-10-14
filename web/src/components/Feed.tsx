@@ -1,8 +1,12 @@
 import { metrics, relativeTime } from '../lib/live';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { ListFilter, PanelLeftClose, Pause, Play } from 'lucide-react';
 import { eventTime, utc, type Observation } from '../data/events';
 import { Button, Chip, EmptyState, SeverityGlyph } from './ui';
+
+// Rendering thousands of rows makes every update slow; the newest page is
+// what people read, and the rest is one click away.
+const PAGE = 150;
 
 export function FeedRow({
   event,
@@ -22,7 +26,13 @@ export function FeedRow({
   const detail = (
     event.data_class === 'KEV'
       ? [event.attrs?.cve ?? event.src, event.attrs?.vendor, event.attrs?.product]
-      : [event.src, event.asn, event.country_code, event.attrs?.malware]
+      : event.data_class === 'BRCH'
+        ? [
+            event.attrs?.organisation,
+            `${Number(event.attrs?.records ?? 0).toLocaleString('en-US')} accounts`,
+            event.attrs?.breach_date && `breached ${event.attrs.breach_date}`,
+          ]
+        : [event.src, event.asn, event.country_code, event.attrs?.malware]
   )
     .filter(Boolean)
     .join(' · ');
@@ -80,10 +90,15 @@ export function Feed({
   const [sort, setSort] = useState('Newest');
   const [compact, setCompact] = useState(false);
   const list = useRef<HTMLUListElement>(null);
-  const sorted = [...events].sort((a, b) =>
-    sort === 'Severity'
-      ? b.severity - a.severity || b.seq - a.seq
-      : Date.parse(eventTime(b)) - Date.parse(eventTime(a)),
+  const [limit, setLimit] = useState(PAGE);
+  const sorted = useMemo(
+    () =>
+      [...events].sort((a, b) =>
+        sort === 'Severity'
+          ? b.severity - a.severity || b.seq - a.seq
+          : Date.parse(eventTime(b)) - Date.parse(eventTime(a)),
+      ),
+    [events, sort],
   );
   return (
     <div className={`feed ${mini ? 'feed-mini' : ''}`}>
@@ -173,7 +188,7 @@ export function Feed({
           buttons[next]?.focus();
         }}
       >
-        {sorted.map((event) => (
+        {sorted.slice(0, limit).map((event) => (
           <li key={event.event_uid}>
             <FeedRow
               event={event}
@@ -186,6 +201,12 @@ export function Feed({
           </li>
         ))}
       </ul>
+      {sorted.length > limit && (
+        <Button variant="ghost" className="feed-more" onClick={() => setLimit((n) => n + PAGE)}>
+          Show {Math.min(PAGE, sorted.length - limit).toLocaleString('en-US')} more of{' '}
+          {(sorted.length - limit).toLocaleString('en-US')}
+        </Button>
+      )}
       {!events.length && (
         <EmptyState action={<Button onClick={clearFilters}>Clear filters</Button>}>
           No events match these filters.

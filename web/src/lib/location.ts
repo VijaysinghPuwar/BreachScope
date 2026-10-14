@@ -1,13 +1,16 @@
 import type { Observation } from '../data/events';
+/** Vulnerabilities and breach reports name a product or an organisation, never a place. */
+export function notGeographic(event: Observation) {
+  return event.data_class === 'KEV' || event.data_class === 'BRCH';
+}
 export function countryOnly(event: Observation) {
   return (
-    event.data_class !== 'KEV' &&
+    !notGeographic(event) &&
     ['dbip_country', 'feed_country', 'Country centroid'].includes(event.geo_method)
   );
 }
 export function locationLabel(event: Observation) {
-  if (event.data_class === 'KEV' || ['none', 'Not applicable'].includes(event.geo_method))
-    return null;
+  if (notGeographic(event) || ['none', 'Not applicable'].includes(event.geo_method)) return null;
   if (countryOnly(event)) return 'approx · country';
   return ['approx · city', event.attrs?.city].filter(Boolean).join(' · ');
 }
@@ -34,6 +37,8 @@ export function rawRecordUrl(event: Observation): string | null {
     if (raw.source === 'Feodo Tracker') return `https://feodotracker.abuse.ch/browse/host/${ip}/`;
     if (raw.source === 'DShield') return `https://isc.sans.edu/ipinfo/${ip}`;
   }
+  if (raw.data_class === 'breach_report' && raw.source_record_id)
+    return `https://haveibeenpwned.com/PwnedWebsites#${encodeURIComponent(raw.source_record_id)}`;
   const cve = String(raw.attrs?.cve ?? '');
   if (raw.data_class === 'vulnerability' && /^CVE-\d{4}-\d{4,}$/i.test(cve))
     return `https://nvd.nist.gov/vuln/detail/${cve}`;

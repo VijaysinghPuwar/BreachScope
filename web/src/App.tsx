@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import {
   dataClasses,
@@ -10,7 +10,8 @@ import {
 import { matchesFilters, useLiveFeed, useSample } from './lib/api';
 import { useReducedMotion, useViewport } from './lib/useViewport';
 import { defaultLayers, type MapActions, type Projection } from './map/types';
-import { type SnapPoint } from './components/ui';
+import { Button, type SnapPoint } from './components/ui';
+import { ChevronUp } from 'lucide-react';
 import { Feed } from './components/Feed';
 import { EventPanel } from './components/EventPanel';
 import { TimelineBar } from './components/TimelineBar';
@@ -18,12 +19,17 @@ import { TopBar } from './components/TopBar';
 import { ConsoleView } from './components/ConsoleView';
 import { ConsoleDialogs } from './components/ConsoleDialogs';
 import { Pages } from './components/Pages';
+import { Intro } from './components/Intro';
+import { ArrivalToast } from './components/ArrivalToast';
+
+const SpaceView = lazy(() => import('./space/SpaceView'));
 import { navigation } from './data/navigation';
 export default function App() {
   const viewport = useViewport();
   const reducedMotion = useReducedMotion();
   const live = useLiveFeed();
   const path = window.location.pathname.replace(/\/$/, '') || '/';
+  const isConsole = path === '/' || path === '/space';
   const [classes, setClasses] = useState<DataClass[]>(
     new URLSearchParams(window.location.search).get('sim') === '1'
       ? [...dataClasses]
@@ -34,7 +40,21 @@ export default function App() {
   const [layers, setLayers] = useState(defaultLayers);
   const [mapActions, setMapActions] = useState<MapActions | null>(null);
   const [feedOpen, setFeedOpen] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  // First view is the map alone; the feed and timeline open on request.
+  const [collapsed, setCollapsed] = useState(true);
+  const [timelineOpen, setTimelineOpen] = useState(false);
+  // The space view has its own address so it can be shared and the browser
+  // back button returns to Earth.
+  const [space, setSpace] = useState(path === '/space');
+  const goToSpace = useCallback((on: boolean) => {
+    setSpace(on);
+    window.history.pushState(null, '', on ? '/space' : '/');
+  }, []);
+  useEffect(() => {
+    const onPop = () => setSpace(window.location.pathname === '/space');
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
   const [snap, setSnap] = useState<SnapPoint>('peek');
   const [replay, setReplay] = useState(false);
   const [playhead, setPlayhead] = useState<number | null>(null);
@@ -77,7 +97,7 @@ export default function App() {
   };
   const closePanel = () => {
     setSelected(null);
-    if (viewport.mobile) setSnap('half');
+    if (viewport.mobile) setSnap('peek');
   };
   const clearFilters = () => {
     setClasses([...initialClasses]);
@@ -91,6 +111,9 @@ export default function App() {
       if (event.key === 'Escape') {
         setSelected(null);
         setFeedOpen(false);
+        // On a phone a closed detail must give the map back, not leave a
+        // full-height empty sheet over it.
+        setSnap('peek');
         setSearchOpen(false);
         setMoreOpen(false);
         return;
@@ -181,6 +204,27 @@ export default function App() {
   return (
     <TooltipPrimitive.Provider delayDuration={350}>
       <div className={`app ${viewport.mobile ? 'is-mobile' : ''} ${replay ? 'is-replay' : ''}`}>
+        <Intro
+          feedsLoaded={live.updatedAt !== null || live.error !== null}
+          mapReady={mapActions !== null || !isConsole || space || live.error !== null}
+          eventCount={live.events.length}
+        />
+        {space && (
+          <div className="space-screen">
+            <Suspense fallback={null}>
+              <SpaceView reducedMotion={reducedMotion} onReturnToEarth={() => goToSpace(false)} />
+            </Suspense>
+          </div>
+        )}
+        {isConsole && !space && (
+          <ArrivalToast
+            events={live.events}
+            newIds={live.newIds}
+            now={live.now}
+            enabled={mapActions !== null && !replay}
+            onSelect={selectEvent}
+          />
+        )}
         <a className="skip-link" href="#main">
           Skip to content
         </a>
@@ -204,7 +248,7 @@ export default function App() {
             Sample data. Live feeds are not connected yet.
           </div>
         )}
-        {path === '/' ? (
+        {isConsole ? (
           <>
             <ConsoleView
               viewport={viewport}
@@ -226,6 +270,7 @@ export default function App() {
               openFeed={openFeed}
               classes={classes}
               toggleClass={toggleClass}
+              onSpace={() => goToSpace(true)}
               search={search}
               clearSearch={() => setSearch('')}
               hud={hud}
@@ -237,7 +282,15 @@ export default function App() {
               onSnap={setSnap}
               closePanel={closePanel}
             />
-            {(!viewport.mobile || replay) && (
+            {!viewport.mobile && !replay && !timelineOpen && (
+              <div className="timeline-toggle">
+                <Button variant="ghost" onClick={() => setTimelineOpen(true)}>
+                  <ChevronUp aria-hidden="true" />
+                  Show timeline
+                </Button>
+              </div>
+            )}
+            {((!viewport.mobile && (timelineOpen || replay)) || (viewport.mobile && replay)) && (
               <TimelineBar
                 events={events.filter((event) => matchesFilters(event, { classes, search }))}
                 now={live.now}
@@ -246,6 +299,7 @@ export default function App() {
                 mobile={viewport.mobile}
                 onReplay={setReplay}
                 onPlayhead={setPlayhead}
+                onHide={replay ? undefined : () => setTimelineOpen(false)}
               />
             )}
           </>

@@ -27,7 +27,9 @@ export function useLiveFeed() {
   useEffect(() => {
     const timer = setInterval(() => {
       if (document.visibilityState !== 'hidden') setNow(Date.now());
-    }, 1000);
+      // Relative times are shown in minutes, so a 5 s tick is plenty; every
+      // tick re-renders the feed.
+    }, 5000);
     return () => clearInterval(timer);
   }, []);
   useEffect(() => {

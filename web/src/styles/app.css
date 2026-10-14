@@ -793,6 +793,16 @@ select {
 .map-area .map-canvas {
   position: absolute;
   inset: 0;
+  opacity: 0;
+  transition: opacity 700ms var(--ease-standard);
+}
+.map-area .map-canvas[data-ready='true'] {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .map-area .map-canvas {
+    transition: none;
+  }
 }
 .map-loading {
   position: absolute;
@@ -1172,6 +1182,14 @@ select {
 .related-modal li {
   padding: 12px 0;
   border-bottom: 1px solid var(--border-subtle);
+}
+.timeline-toggle {
+  display: flex;
+  justify-content: center;
+  height: 40px;
+  align-items: center;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border-subtle);
 }
 .timeline {
   height: 112px;
@@ -2000,4 +2018,182 @@ select {
   .skeleton {
     animation: none;
   }
+}
+
+/* Intro screen while the feeds and the map load. Calm on purpose: a slow
+   progress line and plain steps, then a gentle fade. */
+.intro {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: var(--bg-base);
+  transition: opacity 600ms var(--ease-standard);
+}
+.intro[data-leaving='true'] {
+  opacity: 0;
+  pointer-events: none;
+}
+.intro-card {
+  width: min(240px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.intro-wordmark {
+  font: 600 24px/32px var(--font-sans);
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+.intro-track {
+  height: 2px;
+  background: var(--border-subtle);
+  border-radius: 1px;
+  overflow: hidden;
+}
+.intro-bar {
+  height: 100%;
+  background: var(--accent);
+  transform-origin: left;
+  transition: transform 900ms var(--ease-standard);
+}
+.intro-status {
+  margin: 0;
+  font: 400 12px/16px var(--font-sans);
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+@media (prefers-reduced-motion: reduce) {
+  .intro,
+  .intro-bar {
+    transition: none;
+  }
+}
+
+/* Arrival card: bottom right on desktop, top on mobile. */
+.arrival-toast {
+  position: fixed;
+  right: 16px;
+  bottom: 64px;
+  z-index: 40;
+  display: flex;
+  align-items: flex-start;
+  width: min(320px, calc(100vw - 32px));
+  background: var(--bg-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-popover);
+  animation: arrival-in 280ms var(--ease-standard);
+}
+.arrival-body {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 12px 4px 12px 14px;
+  text-align: left;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.arrival-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 600 13px/20px var(--font-sans);
+}
+.arrival-subject {
+  font: 400 13px/18px var(--font-sans);
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.arrival-meta {
+  font: 400 11px/16px var(--font-sans);
+  color: var(--text-tertiary);
+}
+.arrival-close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: 6px 6px 0 0;
+  color: var(--text-tertiary);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+.arrival-close:hover {
+  color: var(--text-primary);
+  background: var(--bg-raised);
+}
+.arrival-close svg {
+  width: 16px;
+  height: 16px;
+}
+@keyframes arrival-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* One ring spreading across the screen when a breach is disclosed. */
+.global-pulse {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 5;
+  width: 120vmax;
+  height: 120vmax;
+  margin: -60vmax 0 0 -60vmax;
+  border: 2px solid var(--sev-4);
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  animation: global-pulse 2.4s var(--ease-standard);
+}
+@keyframes global-pulse {
+  from {
+    transform: scale(0.02);
+    opacity: 0.8;
+  }
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+@media (max-width: 767px) {
+  /* Above the peek sheet and tab bar, clear of the map controls at the top. */
+  .arrival-toast {
+    bottom: calc(var(--tabbar-h) + var(--sheet-peek) + 12px);
+    left: 16px;
+    right: 16px;
+    width: auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .arrival-toast {
+    animation: none;
+  }
+  .global-pulse {
+    display: none;
+  }
+}
+
+.feed-more {
+  margin: 8px 12px 12px;
+}
+
+/* The space view covers the console; the map stays mounted underneath so
+   returning to Earth is instant and keeps the camera where it was. */
+.space-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--bg-base);
 }

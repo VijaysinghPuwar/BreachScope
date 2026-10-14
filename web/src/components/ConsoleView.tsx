@@ -1,4 +1,5 @@
 import { lazy, Suspense, type ReactNode } from 'react';
+import { MapErrorBoundary } from '../map/MapErrorBoundary';
 import { List } from 'lucide-react';
 import type { Observation, DataClass } from '../data/events';
 import type { Layers, MapActions, Projection } from '../map/types';
@@ -29,6 +30,7 @@ export function ConsoleView(p: {
   openFeed(): void;
   classes: DataClass[];
   toggleClass(code: DataClass): void;
+  onSpace(): void;
   search: string;
   clearSearch(): void;
   hud: boolean;
@@ -67,27 +69,30 @@ export function ConsoleView(p: {
         aria-label="Observation map"
       >
         <h1 className="sr-only">Live Console</h1>
-        <Suspense
-          fallback={
-            <div className="map-loading" role="status">
-              <Skeleton className="map-skeleton" />
-              <span>Loading map…</span>
-            </div>
-          }
-        >
-          <MapCanvas
-            projection={p.projection}
-            events={p.events}
-            selected={p.selected}
-            layers={p.layers}
-            mobile={viewport.mobile}
-            reducedMotion={p.reducedMotion}
-            onSelect={p.onSelect}
-            onReady={p.onReady}
-            onTable={p.openFeed}
-            summary={`Map: ${p.events.length} events`}
-          />
-        </Suspense>
+        <MapErrorBoundary>
+          <Suspense
+            fallback={
+              <div className="map-loading" role="status">
+                <Skeleton className="map-skeleton" />
+                <span>Loading map…</span>
+              </div>
+            }
+          >
+            <MapCanvas
+              projection={p.projection}
+              events={p.events}
+              selected={p.selected}
+              layers={p.layers}
+              mobile={viewport.mobile}
+              reducedMotion={p.reducedMotion}
+              onSelect={p.onSelect}
+              onReady={p.onReady}
+              onTable={p.openFeed}
+              onSpace={p.onSpace}
+              summary={`Map: ${p.events.length} events`}
+            />
+          </Suspense>
+        </MapErrorBoundary>
         <MapControls
           projection={p.projection}
           onProjection={p.onProjection}
@@ -97,6 +102,7 @@ export function ConsoleView(p: {
           mobile={viewport.mobile}
           classes={p.classes}
           onToggleClass={p.toggleClass}
+          onSpace={p.onSpace}
         />
         {p.search && (
           <div className="map-filter">

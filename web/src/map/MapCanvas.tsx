@@ -15,6 +15,7 @@ import { countryCodes, countryOnly, locationLabel } from '../lib/location';
 import { Banner, Button } from '../components/ui';
 import { mapStyle } from './style';
 import type { Layers, MapActions, Projection } from './types';
+import { ArrivalRings } from './arrivals';
 setWorkerUrl(workerUrl);
 interface Props {
   projection: Projection;
@@ -26,6 +27,7 @@ interface Props {
   onSelect(event: Observation): void;
   onReady(actions: MapActions): void;
   onTable(): void;
+  onSpace(): void;
   summary: string;
 }
 // The sphere's diameter scales with 512 * 2^zoom / pi at the equator.
@@ -35,6 +37,7 @@ export default function MapCanvas(props: Props) {
   const map = useRef<Map | null>(null);
   const current = useRef(props);
   const [ready, setReady] = useState(false);
+  const arrivals = useRef<ArrivalRings | null>(null);
   const [failed, setFailed] = useState(false);
   const [hover, setHover] = useState<Observation | null>(null);
   useEffect(() => {
@@ -49,7 +52,9 @@ export default function MapCanvas(props: Props) {
         container: container.current,
         center: [-28, 25],
         zoom: defaultZoom(container.current.clientHeight),
-        minZoom: 0,
+        // Smaller than this the globe is a speck; scrolling further out hands
+        // over to the space view instead.
+        minZoom: 0.6,
         maxZoom: 12,
         attributionControl: false,
         dragRotate: false,
@@ -60,6 +65,36 @@ export default function MapCanvas(props: Props) {
       });
       map.current = instance;
       instance.touchZoomRotate.disableRotation();
+      // Keep scrolling out at the widest view and the camera leaves Earth for
+      // the space view. A little resistance first, so it never happens by accident.
+      // Trackpads send many small deltas and mouse wheels a few large ones, so
+      // count both. Zoom eases after each step, so the count survives the
+      // easing and only resets after a pause or a zoom back in.
+      let pushOut = 0;
+      let steps = 0;
+      let last = 0;
+      instance.getCanvasContainer().addEventListener(
+        'wheel',
+        (event) => {
+          const now = performance.now();
+          if (event.deltaY <= 0 || now - last > 1200) {
+            pushOut = 0;
+            steps = 0;
+          }
+          last = now;
+          if (event.deltaY <= 0) return;
+          // Zoom settles a little above the minimum, so allow some slack.
+          if (instance.getZoom() > instance.getMinZoom() + 0.3) return;
+          pushOut += event.deltaY;
+          steps += 1;
+          if (pushOut > 300 || steps > 8) {
+            pushOut = 0;
+            steps = 0;
+            current.current.onSpace();
+          }
+        },
+        { passive: true },
+      );
       instance.getCanvas().setAttribute('aria-label', current.current.summary);
       instance.getCanvas().setAttribute('role', 'img');
       instance.on('error', () => {
@@ -117,6 +152,10 @@ export default function MapCanvas(props: Props) {
             });
           },
         });
+        // The first frame can be drawn before the container has its final
+        // size, which stretches the globe into an oval. Size it now; the
+        // canvas stays invisible until ready (see .map-canvas in app.css).
+        instance.resize();
         setReady(true);
       });
     } catch {
@@ -132,6 +171,8 @@ export default function MapCanvas(props: Props) {
     return () => {
       disposed = true;
       observer.disconnect();
+      arrivals.current?.destroy();
+      arrivals.current = null;
       instance.remove();
       map.current = null;
     };
@@ -139,65 +180,75 @@ export default function MapCanvas(props: Props) {
   useEffect(() => {
     const instance = map.current;
     if (!ready || !instance) return;
-    instance.setProjection({ type: props.projection === 'Flat' ? 'mercator' : 'globe' });
+    const type = props.projection === 'Flat' ? 'mercator' : 'globe';
+    const cancel = whenStyleReady(instance, () => instance.setProjection({ type }));
     if (!props.reducedMotion)
       instance.getCanvas().animate([{ opacity: 0.65 }, { opacity: 1 }], { duration: 600 });
+    return cancel;
   }, [props.projection, props.reducedMotion, ready]);
   useEffect(() => {
     const instance = map.current;
     if (!ready || !instance) return;
-    (instance.getSource('observations') as GeoJSONSource).setData(mapFeatures(props.events));
-    const countries = countryCodes(props.events);
-    for (const layer of ['country-shading', 'country-approximation'])
-      instance.setFilter(layer, ['in', ['get', 'iso_a2'], ['literal', countries]]);
-    const visibility = {
-      arcs: props.layers.arcs,
-      points: props.layers.points,
-      'location-labels': props.layers.points,
-      'country-shading': props.layers.points,
-      'country-approximation': props.layers.points,
-      accuracy: props.layers.accuracy,
-      sensor: props.layers.sensors,
-      borders: props.layers.borders,
-      graticule: props.layers.graticule && props.projection === 'Globe',
-    };
-    Object.entries(visibility).forEach(([id, visible]) =>
-      instance.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none'),
-    );
+    return whenStyleReady(instance, () => {
+      (instance.getSource('observations') as GeoJSONSource | undefined)?.setData(
+        mapFeatures(props.events),
+      );
+      arrivals.current ??= new ArrivalRings(instance, () => current.current.reducedMotion);
+      arrivals.current.update(props.events);
+      const countries = countryCodes(props.events);
+      for (const layer of ['country-shading', 'country-approximation'])
+        instance.setFilter(layer, ['in', ['get', 'iso_a2'], ['literal', countries]]);
+      const visibility = {
+        arcs: props.layers.arcs,
+        points: props.layers.points,
+        'location-labels': props.layers.points,
+        'country-shading': props.layers.points,
+        'country-approximation': props.layers.points,
+        accuracy: props.layers.accuracy,
+        sensor: props.layers.sensors,
+        borders: props.layers.borders,
+        graticule: props.layers.graticule && props.projection === 'Globe',
+      };
+      Object.entries(visibility).forEach(([id, visible]) =>
+        instance.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none'),
+      );
+    });
   }, [props.events, props.layers, props.projection, ready]);
   useEffect(() => {
     const instance = map.current;
     if (!ready || !instance) return;
-    const selected = props.events.find((event) => event.event_uid === props.selected);
-    (instance.getSource('selection') as GeoJSONSource).setData({
-      type: 'FeatureCollection',
-      features:
-        selected?.coordinates && !countryOnly(selected)
-          ? [
-              {
-                type: 'Feature',
-                properties: {},
-                geometry: { type: 'Point', coordinates: selected.coordinates },
-              },
-            ]
-          : [],
+    return whenStyleReady(instance, () => {
+      const selected = props.events.find((event) => event.event_uid === props.selected);
+      (instance.getSource('selection') as GeoJSONSource | undefined)?.setData({
+        type: 'FeatureCollection',
+        features:
+          selected?.coordinates && !countryOnly(selected)
+            ? [
+                {
+                  type: 'Feature',
+                  properties: {},
+                  geometry: { type: 'Point', coordinates: selected.coordinates },
+                },
+              ]
+            : [],
+      });
+      // Rings and location labels only for the selected and hovered marks;
+      // drawn for every point they bury the map.
+      const focused: ExpressionSpecification = [
+        'literal',
+        [props.selected, hover?.event_uid].filter((uid): uid is string => !!uid),
+      ];
+      instance.setFilter('accuracy', [
+        'all',
+        ['==', ['get', 'kind'], 'accuracy'],
+        ['in', ['get', 'uid'], focused],
+      ]);
+      instance.setFilter('location-labels', [
+        'all',
+        ['==', ['get', 'kind'], 'point'],
+        ['in', ['get', 'uid'], focused],
+      ]);
     });
-    // Rings and location labels only for the selected and hovered marks;
-    // drawn for every point they bury the map.
-    const focused: ExpressionSpecification = [
-      'literal',
-      [props.selected, hover?.event_uid].filter((uid): uid is string => !!uid),
-    ];
-    instance.setFilter('accuracy', [
-      'all',
-      ['==', ['get', 'kind'], 'accuracy'],
-      ['in', ['get', 'uid'], focused],
-    ]);
-    instance.setFilter('location-labels', [
-      'all',
-      ['==', ['get', 'kind'], 'point'],
-      ['in', ['get', 'uid'], focused],
-    ]);
   }, [props.selected, props.events, hover, ready]);
   useEffect(() => {
     if (ready) map.current?.getCanvas().setAttribute('aria-label', props.summary);
@@ -233,4 +284,26 @@ export default function MapCanvas(props: Props) {
       )}
     </>
   );
+}
+
+/**
+ * Runs a style change now, or once the style has finished (re)loading if it is
+ * mid-load. MapLibre throws "Style is not done loading" otherwise. Returns a
+ * cleanup that drops a still-pending run, for use as an effect cleanup.
+ */
+function whenStyleReady(instance: Map, apply: () => void): () => void {
+  try {
+    apply();
+    return () => {};
+  } catch {
+    const run = () => {
+      try {
+        apply();
+      } catch (error) {
+        console.warn('Map update skipped', error);
+      }
+    };
+    instance.once('style.load', run);
+    return () => instance.off('style.load', run);
+  }
 }

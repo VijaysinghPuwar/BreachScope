@@ -1,7 +1,7 @@
 import { histogram, day, minute } from '../lib/live';
 import type { Observation } from '../data/events';
 import { useEffect, useState } from 'react';
-import { Pause, Play, SkipBack, SkipForward } from 'lucide-react';
+import { ChevronDown, Pause, Play, SkipBack, SkipForward } from 'lucide-react';
 import { Button, SeverityGlyph, Tooltip } from './ui';
 import { utc, type Severity } from '../data/events';
 
@@ -13,6 +13,7 @@ export function TimelineBar({
   onReplay,
   mobile = false,
   onPlayhead,
+  onHide,
 }: {
   events: Observation[];
   now: number;
@@ -21,6 +22,7 @@ export function TimelineBar({
   onReplay(value: boolean): void;
   mobile?: boolean;
   onPlayhead?(value: number | null): void;
+  onHide?(): void;
 }) {
   const bins = histogram(events, now);
   const maxCount = Math.max(1, ...bins.map((bin) => bin.counts.reduce((a, b) => a + b, 0)));
@@ -56,6 +58,12 @@ export function TimelineBar({
             <SeverityGlyph key={level} level={level} />
           ))}
         </div>
+        {onHide && (
+          <Button variant="ghost" onClick={onHide}>
+            <ChevronDown aria-hidden="true" />
+            Hide timeline
+          </Button>
+        )}
         <Button variant="ghost" onClick={() => onReplay(!replay)}>
           {replay ? 'Back to live' : 'Replay'}
         </Button>

@@ -99,11 +99,26 @@ export function EventPanel({
           <Banner>Not geographic. Shown on the timeline as ticks.</Banner>
         </div>
       )}
+      {event.data_class === 'BRCH' && (
+        <div className="panel-banner">
+          <Banner>
+            Disclosed breach. The source names the organisation, not a location, so it is not drawn
+            on the map.
+          </Banner>
+        </div>
+      )}
       {(event.src || event.asn || Object.keys(event.attrs ?? {}).length > 0) && (
         <PanelSection title="Summary">
           <Fields
             rows={[
-              [event.data_class === 'KEV' ? 'CVE' : 'IP / indicator', event.src],
+              [
+                event.data_class === 'KEV'
+                  ? 'CVE'
+                  : event.data_class === 'BRCH'
+                    ? 'Organisation'
+                    : 'IP / indicator',
+                event.src,
+              ],
               ['ASN', event.asn],
               ['Country', event.country],
             ]}
@@ -111,7 +126,13 @@ export function EventPanel({
           <Fields
             rows={Object.entries(event.attrs ?? {}).map(([key, value]) => [
               key.replaceAll('_', ' '),
-              value,
+              typeof value === 'boolean'
+                ? value
+                  ? 'Yes'
+                  : 'No'
+                : typeof value === 'number'
+                  ? value.toLocaleString('en-US')
+                  : value,
             ])}
           />
         </PanelSection>

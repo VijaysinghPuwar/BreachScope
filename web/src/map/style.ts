@@ -44,6 +44,7 @@ export function mapStyle(projection: Projection): StyleSpecification {
       graticule: { type: 'geojson', data: graticule() },
       observations: { type: 'geojson', data: empty },
       selection: { type: 'geojson', data: empty },
+      arrivals: { type: 'geojson', data: empty },
       sensor: {
         type: 'geojson',
         data: useSample
@@ -152,6 +153,32 @@ export function mapStyle(projection: Projection): StyleSpecification {
           'line-color': token('--text-tertiary'),
           'line-width': 1,
           'line-dasharray': [3, 3],
+        },
+      },
+      {
+        // A ripple spreading over the surface from where a new event was
+        // reported, fading as it travels.
+        id: 'arrival-ripple',
+        type: 'line',
+        source: 'arrivals',
+        filter: ['!=', ['geometry-type'], 'Point'],
+        paint: {
+          'line-color': severityColor,
+          'line-width': ['interpolate', ['linear'], ['get', 'progress'], 0, 3, 1, 1],
+          'line-opacity': ['interpolate', ['linear'], ['get', 'progress'], 0, 1, 0.6, 0.6, 1, 0],
+        },
+      },
+      {
+        // The point itself flashes once as the ripple starts.
+        id: 'arrival-flash',
+        type: 'circle',
+        source: 'arrivals',
+        filter: ['==', ['geometry-type'], 'Point'],
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['get', 'progress'], 0, 3, 0.3, 9, 1, 4],
+          'circle-color': severityColor,
+          'circle-opacity': ['interpolate', ['linear'], ['get', 'progress'], 0, 0.9, 1, 0],
+          'circle-pitch-alignment': 'map',
         },
       },
       {
