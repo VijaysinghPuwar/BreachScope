@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/logo.svg" width="88" height="88" alt="BreachScope logo">
+  <img src="docs/logo-mark.svg" width="88" height="88" alt="BreachScope logo">
 </p>
 
 <h1 align="center">BreachScope</h1>
