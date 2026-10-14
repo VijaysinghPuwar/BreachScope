@@ -23,15 +23,8 @@ import {
   separationFade,
   targetFor,
 } from './scale';
-import {
-  RING_INNER_KM,
-  RING_OUTER_KM,
-  earthPlaceholder,
-  earthTexture,
-  galaxyTexture,
-  planetTexture,
-  saturnRingTexture,
-} from './textures';
+import { RING_INNER_KM, RING_OUTER_KM } from './textures';
+import { loadTextureImage, toTexture, type TextureRequest } from './textureSource';
 import { computeWorld, EARTH_MOON_BARYCENTRE, type World } from './world';
 
 export interface Palette {
@@ -57,6 +50,8 @@ export interface LabelSpot {
 export interface FrameInfo {
   outer: number;
   spots: LabelSpot[];
+  /** The selected object has left the current scale, so its card should close. */
+  selectionGone: boolean;
 }
 
 export interface EngineHooks {
@@ -87,6 +82,9 @@ const DOT_COLOUR: Record<string, string> = {
   triton: '#c9b3ad',
   pluto: '#c7b39c',
 };
+
+/** Earth's ocean colour, shown until the continents are drawn. */
+const EARTH_OCEAN = '#23384d';
 
 const PARENT: Record<string, string> = {
   moon: 'earth',
@@ -130,6 +128,8 @@ interface Body {
   object: SpaceObject;
   mesh: THREE.Mesh;
   radiusM: number;
+  /** False until the texture job has run; the body shows a flat colour until then. */
+  textured: boolean;
   clouds?: THREE.Mesh;
   ring?: THREE.Mesh;
 }
@@ -149,6 +149,7 @@ interface Disc {
   mesh: THREE.Mesh;
   material: THREE.MeshBasicMaterial;
   sizeM: number;
+  textured: boolean;
 }
 
 interface Cloud {
@@ -227,6 +228,22 @@ export class SpaceEngine {
   private ratio = 1;
   private raf = 0;
   private disposed = false;
+  /**
+   * Work that is not needed for the first frame: textures, the Milky Way. Jobs run one at
+   * a time in idle time after the first frame, so opening the view does not freeze the page.
+   * Anything that comes into view jumps the queue.
+   */
+  private readonly jobs = new Map<string, () => void>();
+  private readonly urgent = new Set<string>();
+  private idleHandle = 0;
+  private framesDrawn = 0;
+  /** 1x1 white map every textured material starts with; see applyTexture. */
+  private readonly blank = (() => {
+    const texture = new THREE.DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.needsUpdate = true;
+    return texture;
+  })();
   private spots: LabelSpot[] = [];
   private target: Vec3 = [0, 0, 0];
 
@@ -316,7 +333,7 @@ export class SpaceEngine {
     this.scene.add(this.markers);
 
     this.build();
-    void this.loadEarth();
+    this.queueStartupJobs();
   }
 
   private build() {
@@ -365,6 +382,27 @@ export class SpaceEngine {
     );
     this.addLoop(earth, earthOrbit, 'path', 'sun', earth.distanceM);
 
+    const dashed = new THREE.LineDashedMaterial({
+      color: new THREE.Color(this.palette.borderStrong),
+      dashSize: 0.02,
+      gapSize: 0.03,
+      transparent: true,
+      opacity: 0.55,
+      depthWrite: false,
+    });
+    const dashedCircle = circleGeometry(256);
+    for (let k = 0; k < 8; k++) {
+      const line = new THREE.Line(dashedCircle, dashed);
+      if (k === 0) line.computeLineDistances();
+      line.visible = false;
+      line.frustumCulled = false;
+      this.decades.push(line);
+      this.scene.add(line);
+    }
+  }
+
+  /** About 64,000 points, so it is built in idle time rather than up front. */
+  private buildMilkyWayCloud() {
     const milkyWay = buildMilkyWay(hashSeed('milky-way'));
     const material = new THREE.PointsMaterial({
       size: 1.6,
@@ -387,57 +425,142 @@ export class SpaceEngine {
       outerM: 50_000 * M_PER_LY,
       innerM: 0,
     };
+  }
 
-    const dashed = new THREE.LineDashedMaterial({
-      color: new THREE.Color(this.palette.borderStrong),
-      dashSize: 0.02,
-      gapSize: 0.03,
-      transparent: true,
-      opacity: 0.55,
-      depthWrite: false,
+  private queueStartupJobs() {
+    // Nearest first: what Earth's view needs, then the planets, then the far things.
+    const order = ['earth', 'moon', 'sun', 'mercury', 'venus', 'mars', 'jupiter', 'saturn'];
+    const bodies = [...this.bodies].sort((a, b) => {
+      const rank = (id: string) => (order.includes(id) ? order.indexOf(id) : order.length);
+      return rank(a.object.id) - rank(b.object.id);
     });
-    const dashedCircle = circleGeometry(256);
-    for (let k = 0; k < 8; k++) {
-      const line = new THREE.Line(dashedCircle, dashed);
-      if (k === 0) line.computeLineDistances();
-      line.visible = false;
-      line.frustumCulled = false;
-      this.decades.push(line);
-      this.scene.add(line);
+    for (const body of bodies)
+      this.jobs.set(`body:${body.object.id}`, () => this.textureBody(body));
+    for (const disc of this.discs)
+      this.jobs.set(`disc:${disc.object.id}`, () => this.textureDisc(disc));
+    this.jobs.set('milky-way', () => this.buildMilkyWayCloud());
+  }
+
+  private scheduleJobs() {
+    if (this.idleHandle || this.disposed || this.jobs.size === 0) return;
+    const run = () => {
+      this.idleHandle = 0;
+      this.runNextJob();
+      this.scheduleJobs();
+    };
+    this.idleHandle =
+      typeof requestIdleCallback === 'function'
+        ? requestIdleCallback(run, { timeout: 400 })
+        : window.setTimeout(run, 30);
+  }
+
+  private runNextJob() {
+    const key = this.urgent.values().next().value ?? this.jobs.keys().next().value;
+    if (key === undefined) return;
+    const job = this.jobs.get(key);
+    this.jobs.delete(key);
+    this.urgent.delete(key);
+    if (!job || this.disposed) return;
+    job();
+    this.requestRender();
+  }
+
+  /** Moves a job to the front because its object is on screen now. */
+  private hurry(key: string) {
+    if (!this.jobs.has(key) || this.urgent.has(key)) return;
+    this.urgent.add(key);
+    this.scheduleJobs();
+  }
+
+  /**
+   * Asks for a texture and swaps it in when it arrives. Materials start with a 1x1 blank
+   * map, so the swap reuses the compiled shader instead of compiling a new one.
+   */
+  private applyTexture(
+    request: TextureRequest,
+    material: THREE.MeshStandardMaterial | THREE.MeshBasicMaterial,
+    done: () => void,
+  ) {
+    loadTextureImage(request)
+      .then((image) => {
+        if (this.disposed) return;
+        const texture = toTexture(image);
+        texture.anisotropy = 4;
+        material.map = texture;
+        material.color.set(0xffffff);
+        done();
+        this.requestRender();
+      })
+      .catch(() => {
+        // The flat colour stays; nothing else depends on the texture.
+      });
+  }
+
+  private textureBody(body: Body) {
+    const material = body.mesh.material as THREE.MeshStandardMaterial | THREE.MeshBasicMaterial;
+    const request: TextureRequest =
+      body.object.id === 'earth'
+        ? {
+            kind: 'earth',
+            landUrl: new URL(`${import.meta.env.BASE_URL}geo/land.geojson`, location.href).href,
+          }
+        : { kind: 'planet', skin: body.object.skin ?? 'moon' };
+    this.applyTexture(request, material, () => {
+      body.textured = true;
+    });
+    if (body.clouds) {
+      const clouds = body.clouds;
+      this.applyTexture(
+        { kind: 'planet', skin: 'earth-clouds' },
+        clouds.material as THREE.MeshStandardMaterial,
+        () => {
+          clouds.visible = true;
+        },
+      );
     }
+    if (body.ring) {
+      const ring = body.ring;
+      this.applyTexture({ kind: 'ring' }, ring.material as THREE.MeshBasicMaterial, () => {
+        (ring.material as THREE.MeshBasicMaterial).color.setScalar(0.85);
+        ring.visible = true;
+      });
+    }
+  }
+
+  private textureDisc(disc: Disc) {
+    this.applyTexture(
+      { kind: 'galaxy', morph: disc.object.morph!, seed: hashSeed(disc.object.id) },
+      disc.material,
+      () => {
+        disc.textured = true;
+      },
+    );
   }
 
   private addBody(object: SpaceObject, sphere: THREE.SphereGeometry) {
     const radiusM = object.radiusKm! * 1_000;
-    let material: THREE.Material;
-    if (object.id === 'sun') {
-      const map = new THREE.CanvasTexture(planetTexture('sun'));
-      map.colorSpace = THREE.SRGBColorSpace;
-      material = new THREE.MeshBasicMaterial({ map });
-    } else {
-      const canvas =
-        object.id === 'earth' ? earthPlaceholder() : planetTexture(object.skin ?? 'moon');
-      const map = new THREE.CanvasTexture(canvas);
-      map.colorSpace = THREE.SRGBColorSpace;
-      map.anisotropy = 4;
-      material = new THREE.MeshStandardMaterial({ map, roughness: 1, metalness: 0 });
-    }
+    // A flat colour until the texture job runs (see queueStartupJobs).
+    const colour = object.id === 'earth' ? EARTH_OCEAN : (DOT_COLOUR[object.id] ?? '#9a9a96');
+    const map = this.blank;
+    const material =
+      object.id === 'sun'
+        ? new THREE.MeshBasicMaterial({ color: colour, map })
+        : new THREE.MeshStandardMaterial({ color: colour, map, roughness: 1, metalness: 0 });
     const mesh = new THREE.Mesh(sphere, material);
     mesh.frustumCulled = false;
-    const body: Body = { object, mesh, radiusM };
+    const body: Body = { object, mesh, radiusM, textured: false };
     if (object.id === 'earth') {
-      const clouds = new THREE.CanvasTexture(planetTexture('earth-clouds'));
-      clouds.colorSpace = THREE.SRGBColorSpace;
       body.clouds = new THREE.Mesh(
         sphere,
         new THREE.MeshStandardMaterial({
-          map: clouds,
+          map: this.blank,
           transparent: true,
           depthWrite: false,
           roughness: 1,
         }),
       );
       body.clouds.scale.setScalar(1.008);
+      body.clouds.visible = false;
       mesh.add(body.clouds);
     }
     if (object.rings) {
@@ -452,18 +575,17 @@ export class SpaceEngine {
         uv.setXY(k, (r - inner) / (outer - inner), 0.5);
       }
       geometry.rotateX(-Math.PI / 2);
-      const map = new THREE.CanvasTexture(saturnRingTexture());
-      map.colorSpace = THREE.SRGBColorSpace;
       body.ring = new THREE.Mesh(
         geometry,
         new THREE.MeshBasicMaterial({
-          map,
+          map: this.blank,
           color: new THREE.Color(0.85, 0.85, 0.85),
           transparent: true,
           side: THREE.DoubleSide,
           depthWrite: false,
         }),
       );
+      body.ring.visible = false;
       mesh.add(body.ring);
     }
     this.bodies.push(body);
@@ -513,10 +635,8 @@ export class SpaceEngine {
   }
 
   private addDisc(object: SpaceObject) {
-    const map = new THREE.CanvasTexture(galaxyTexture(object.morph!, hashSeed(object.id)));
-    map.colorSpace = THREE.SRGBColorSpace;
     const material = new THREE.MeshBasicMaterial({
-      map,
+      map: this.blank,
       transparent: true,
       depthWrite: false,
       side: THREE.DoubleSide,
@@ -534,29 +654,14 @@ export class SpaceEngine {
     // Store the base orientation; draw() re-faces the camera each frame.
     mesh.userData.tilt = tilt;
     mesh.userData.turn = turn;
-    this.discs.push({ object, mesh, material, sizeM: (object.sizeLy ?? 50_000) * M_PER_LY });
+    this.discs.push({
+      object,
+      mesh,
+      material,
+      sizeM: (object.sizeLy ?? 50_000) * M_PER_LY,
+      textured: false,
+    });
     this.scene.add(mesh);
-  }
-
-  private async loadEarth() {
-    try {
-      const response = await fetch(`${import.meta.env.BASE_URL}geo/land.geojson`);
-      if (!response.ok) return;
-      const land = (await response.json()) as GeoJSON.FeatureCollection;
-      if (this.disposed) return;
-      const earth = this.bodies.find((body) => body.object.id === 'earth');
-      const material = earth?.mesh.material as THREE.MeshStandardMaterial | undefined;
-      if (!material) return;
-      const map = new THREE.CanvasTexture(earthTexture(land));
-      map.colorSpace = THREE.SRGBColorSpace;
-      map.anisotropy = 8;
-      material.map?.dispose();
-      material.map = map;
-      material.needsUpdate = true;
-      this.requestRender();
-    } catch {
-      // The ocean-only texture stays; nothing else depends on the land data.
-    }
   }
 
   resize(width: number, height: number, ratio: number) {
@@ -609,6 +714,7 @@ export class SpaceEngine {
     const busy = this.hooks.tick(now);
     const moved = this.controls.update();
     this.draw();
+    if (++this.framesDrawn === 1) this.scheduleJobs();
     if (busy || moved) this.requestRender();
   };
 
@@ -678,11 +784,7 @@ export class SpaceEngine {
       if (!other) return Infinity;
       return Math.hypot(own.x - other.x, own.y - other.y);
     };
-    const fadeFor = (object: SpaceObject) => {
-      // The focus and the selection stay labelled, but only while they can still be told
-      // apart from the Sun; at galaxy scale they have merged into it.
-      const pinned = object.id === this.focusId || object.id === this.selectedId;
-      if (pinned && (this.outer < 15 || !object.radiusKm)) return 1;
+    const naturalFade = (object: SpaceObject) => {
       // Each scale shows only what belongs to it: nothing collapsed into its parent and
       // nothing far beyond the camera's range.
       const position = world.positions.get(object.id);
@@ -695,6 +797,15 @@ export class SpaceEngine {
         ? sep * clamp01((this.outer - 19.6) / 0.8)
         : sep;
     };
+    const fadeFor = (object: SpaceObject) => {
+      // The focus and the selection stay fully drawn, but only while they still belong
+      // to this scale; once they leave it they fade like everything else.
+      const fade = naturalFade(object);
+      const pinned = object.id === this.focusId || object.id === this.selectedId;
+      return pinned && fade > 0 ? 1 : fade;
+    };
+    const chosen = this.selectedId ? objectById.get(this.selectedId) : undefined;
+    const selectionGone = chosen !== undefined && naturalFade(chosen) === 0 && !this.flightFrom;
 
     const spots: LabelSpot[] = [];
     const spot = (id: string, x: number, y: number, r: number, sepOk: boolean) => {
@@ -731,6 +842,7 @@ export class SpaceEngine {
             body.mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(xs, ys, zs));
           }
           body.mesh.visible = radiusPx >= MIN_DISC_PX && fade > 0 && s.front;
+          if (body.mesh.visible && !body.textured) this.hurry(`body:${object.id}`);
           dot = body.mesh.visible ? 0 : fade;
         } else {
           dot = fade;
@@ -832,7 +944,9 @@ export class SpaceEngine {
       disc.mesh.rotateZ(disc.mesh.userData.turn as number);
       disc.mesh.rotateX(disc.mesh.userData.tilt as number);
       disc.material.opacity = fade;
-      disc.mesh.visible = fade > 0.01 && s.front;
+      const wanted = fade > 0.01 && s.front;
+      if (wanted && !disc.textured) this.hurry(`disc:${disc.object.id}`);
+      disc.mesh.visible = wanted && disc.textured;
       if (disc.mesh.visible) {
         spot(
           disc.object.id,
@@ -845,9 +959,12 @@ export class SpaceEngine {
     }
 
     // The Milky Way: fades in as the stars give way to the galaxy.
+    if (!this.milkyWay && this.outer > 18.5) this.hurry('milky-way');
     if (this.milkyWay) {
       const c = screen.get('galactic-centre')!.world;
-      const fade = clamp01((this.outer - 17.6) / 1.4);
+      // Fades in only once the view is galaxy sized, so the camera never sits inside the
+      // point cloud, which would read as screen noise.
+      const fade = clamp01((this.outer - 19.4) / 0.8);
       this.milkyWay.points.position.copy(c);
       this.milkyWay.points.scale.setScalar(M_PER_LY / D);
       this.milkyWay.material.opacity = 0.55 * fade;
@@ -856,7 +973,11 @@ export class SpaceEngine {
 
     // Dashed reference circles at powers of ten, in the ecliptic or the galactic plane.
     const scaleNow = scaleFor(this.outer);
-    const ticks = decadeTicks(this.outer, scaleNow.unit);
+    // No reference rings inside the body the camera is looking at.
+    const focusRadiusM = (objectById.get(this.focusId)?.radiusKm ?? 0) * 1_000;
+    const ticks = decadeTicks(this.outer, scaleNow.unit).filter(
+      (tick) => tick > focusRadiusM * 1.3,
+    );
     const plane =
       this.outer < 18.8
         ? planeQuaternion([1, 0, 0], [0, 1, 0])
@@ -879,7 +1000,7 @@ export class SpaceEngine {
     this.renderer.render(this.scene, camera);
     this.spots = spots;
     this.drawOverlay(spots, decadeLabels);
-    this.hooks.onFrame({ outer: this.outer, spots });
+    this.hooks.onFrame({ outer: this.outer, spots, selectionGone });
   }
 
   private drawOverlay(spots: LabelSpot[], decadeLabels: { x: number; y: number; text: string }[]) {
@@ -972,6 +1093,10 @@ export class SpaceEngine {
   dispose() {
     this.disposed = true;
     cancelAnimationFrame(this.raf);
+    if (this.idleHandle) {
+      if (typeof cancelIdleCallback === 'function') cancelIdleCallback(this.idleHandle);
+      clearTimeout(this.idleHandle);
+    }
     this.controls.removeEventListener('change', this.requestRender);
     this.controls.dispose();
     const textures = new Set<THREE.Texture>();

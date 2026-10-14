@@ -14,8 +14,14 @@ variable "admin_cidr" {
   type        = string
 }
 
+variable "ssh_public_key" {
+  description = "Public key for the admin account, as text (for Cloud Shell). Leave empty to read ssh_public_key_path."
+  type        = string
+  default     = ""
+}
+
 variable "ssh_public_key_path" {
-  description = "Public key for the admin account."
+  description = "Public key file for the admin account, used when ssh_public_key is empty."
   type        = string
   default     = "~/.ssh/id_ed25519.pub"
 }

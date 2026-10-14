@@ -224,6 +224,10 @@ export default function SpaceView({ onReturnToEarth, reducedMotion }: SpaceViewP
           ? eng.distanceBetween(chosen.id, 'sun')
           : 0;
       setSunDistance((previous) => (Math.abs(previous - fromSun) > 1e6 ? fromSun : previous));
+      if (info.selectionGone && eng?.selectedId) {
+        eng.selectedId = null;
+        setSelectedId(null);
+      }
       setReady(true);
     };
     try {
@@ -382,10 +386,15 @@ export default function SpaceView({ onReturnToEarth, reducedMotion }: SpaceViewP
     else if (['-', '_', 'ArrowDown'].includes(event.key)) zoomBy(KEY_STEP);
     else if (event.key === 'ArrowLeft') engine?.orbitBy(-10, 0);
     else if (event.key === 'ArrowRight') engine?.orbitBy(10, 0);
-    else if (event.key === 'PageUp')
-      jumpTo(index <= 1 ? homeOuterFor(focus) : SCALES[index - 1]!.home);
-    else if (event.key === 'PageDown') jumpTo(SCALES[Math.min(SCALES.length - 1, index + 1)]!.home);
-    else if (event.key === 'Home') jumpTo(homeOuterFor(focus));
+    // Scale steps read where the zoom is heading, not the last render, so quick repeated
+    // presses each move one more scale.
+    else if (event.key === 'PageUp') {
+      const at = scaleIndex(target.current);
+      jumpTo(at <= 1 ? homeOuterFor(focus) : SCALES[at - 1]!.home);
+    } else if (event.key === 'PageDown') {
+      const at = scaleIndex(target.current);
+      jumpTo(SCALES[Math.min(SCALES.length - 1, at + 1)]!.home);
+    } else if (event.key === 'Home') jumpTo(homeOuterFor(focus));
     else if (event.key === 'End') jumpTo(MAX_OUTER - 0.4);
     else if (event.key === 'Escape') {
       if (selectedId) select(null);

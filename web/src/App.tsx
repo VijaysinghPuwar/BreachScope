@@ -50,6 +50,18 @@ export default function App() {
     setSpace(on);
     window.history.pushState(null, '', on ? '/space' : '/');
   }, []);
+  // Once the globe is up, fetch the space view in idle time so zooming out
+  // past Earth opens it without a download pause.
+  useEffect(() => {
+    if (!mapActions) return;
+    const load = () => void import('./space/SpaceView');
+    if ('requestIdleCallback' in window) {
+      const id = window.requestIdleCallback(load, { timeout: 5000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const timer = setTimeout(load, 3000);
+    return () => clearTimeout(timer);
+  }, [mapActions]);
   useEffect(() => {
     const onPop = () => setSpace(window.location.pathname === '/space');
     window.addEventListener('popstate', onPop);

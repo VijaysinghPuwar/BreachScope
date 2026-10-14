@@ -159,7 +159,7 @@ resource "azurerm_linux_virtual_machine" "sensor" {
 
   admin_ssh_key {
     username   = "sensoradmin"
-    public_key = file(pathexpand(var.ssh_public_key_path))
+    public_key = var.ssh_public_key != "" ? var.ssh_public_key : file(pathexpand(var.ssh_public_key_path))
   }
 
   os_disk {

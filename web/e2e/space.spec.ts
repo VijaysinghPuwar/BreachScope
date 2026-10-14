@@ -120,3 +120,22 @@ test('Escape returns to the globe', async ({ page }) => {
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('space-view')).toHaveCount(0);
 });
+
+test('a card closes when its object leaves the scale', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const view = await openSpace(page, []);
+  await view.focus();
+  await page.keyboard.press('PageDown');
+  await page.keyboard.press('PageDown');
+  await page.keyboard.press('PageDown');
+  await page.keyboard.press('PageDown');
+  await expect(view).toHaveAttribute('data-scale', 'galaxies', SLOW);
+  await page.getByRole('button', { name: /In view/ }).click();
+  await page.getByRole('button', { name: /Andromeda \(M31\)/ }).click();
+  await expect(page.getByRole('region', { name: 'Andromeda (M31) details' })).toBeVisible();
+  await view.focus();
+  await page.keyboard.press('Home');
+  await expect(view).toHaveAttribute('data-scale', 'earth-moon', SLOW);
+  await expect(page.getByRole('region', { name: 'Andromeda (M31) details' })).toHaveCount(0);
+});

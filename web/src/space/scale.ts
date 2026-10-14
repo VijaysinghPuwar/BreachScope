@@ -5,7 +5,7 @@
 // 46.5 billion light-years to the edge of the observable universe.
 
 import { LIGHT_SPEED, M_PER_AU, M_PER_LY, type SpaceObject } from './data';
-import { lerp, type Vec3 } from './astro';
+import { length, lerp, sub, type Vec3 } from './astro';
 
 /** Most zoomed out: the observable universe fits with room around it. */
 export const MAX_OUTER = 27.6;
@@ -129,12 +129,24 @@ const smoothstep = (a: number, b: number, x: number) => {
 };
 
 /**
- * What the camera looks at. Close in it is the focused body; zooming out it drifts to
+ * Zoom range over which the camera slides from `near` to `far`. The slide starts once the
+ * gap between them is about 0.6 of the camera distance and ends when it is about 0.15, so
+ * both stay on screen the whole time and the view never passes through empty space.
+ */
+export function handoverRange(gapM: number): [number, number] {
+  const gap = Math.log10(Math.max(gapM, 1));
+  return [gap + 0.2, gap + 0.8];
+}
+
+/**
+ * What the camera looks at. Close in it is the focused body; zooming out it slides to
  * the Sun, then to the Galactic Centre, so each scale is centred on what matters there.
  */
 export function targetFor(outer: number, focus: Vec3, sun: Vec3, galacticCentre: Vec3): Vec3 {
-  const local = lerp(focus, sun, smoothstep(10.6, 12, outer));
-  return lerp(local, galacticCentre, smoothstep(18.8, 20.6, outer));
+  const [a, b] = handoverRange(length(sub(focus, sun)));
+  const local = lerp(focus, sun, smoothstep(a, b, outer));
+  const [c, d] = handoverRange(length(sub(galacticCentre, sun)));
+  return lerp(local, galacticCentre, smoothstep(c, d, outer));
 }
 
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));

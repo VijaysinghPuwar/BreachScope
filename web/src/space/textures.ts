@@ -267,16 +267,18 @@ function ellipse(p: P, lat0: number, lon0: number, aLon: number, bLat: number): 
 // ---------------------------------------------------------------------------------------------
 // Canvas and sphere grid
 
-function makeCanvas(
-  w: number,
-  h: number,
-): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D | null } {
-  const canvas = document.createElement('canvas');
+/** A DOM canvas on the page, or an OffscreenCanvas inside the texture worker. */
+export type TextureCanvas = HTMLCanvasElement | OffscreenCanvas;
+type Context2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+
+function makeCanvas(w: number, h: number): { canvas: TextureCanvas; ctx: Context2D | null } {
+  const canvas: TextureCanvas =
+    typeof document === 'undefined' ? new OffscreenCanvas(w, h) : document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
-  let ctx: CanvasRenderingContext2D | null = null;
+  let ctx: Context2D | null = null;
   try {
-    ctx = canvas.getContext('2d');
+    ctx = canvas.getContext('2d') as Context2D | null;
   } catch {
     ctx = null;
   }
@@ -944,7 +946,7 @@ const SKINS: Record<PlanetSkin, (c: Ctx) => void> = {
 };
 
 /** Equirectangular: x=0 is longitude -180, x=width is +180; y=0 is latitude +90. */
-export function planetTexture(skin: PlanetSkin, width = 512): HTMLCanvasElement {
+export function planetTexture(skin: PlanetSkin, width = 512): TextureCanvas {
   const w = Math.max(16, Math.round(width));
   const h = Math.max(8, Math.round(w / 2));
   const { canvas, ctx } = makeCanvas(w, h);
@@ -1007,7 +1009,7 @@ function rgbCss(c: RGB): string {
 }
 
 /** Earth before land data loads: ocean only, same ocean colour as earthTexture. */
-export function earthPlaceholder(width = 2048): HTMLCanvasElement {
+export function earthPlaceholder(width = 2048): TextureCanvas {
   const [w, h] = earthSize(width);
   const { canvas, ctx } = makeCanvas(w, h);
   if (!ctx) return canvas;
@@ -1016,12 +1018,7 @@ export function earthPlaceholder(width = 2048): HTMLCanvasElement {
   return canvas;
 }
 
-function traceRings(
-  ctx: CanvasRenderingContext2D,
-  rings: GeoJSON.Position[][],
-  w: number,
-  h: number,
-): void {
+function traceRings(ctx: Context2D, rings: GeoJSON.Position[][], w: number, h: number): void {
   for (const ring of rings) {
     for (let i = 0; i < ring.length; i++) {
       const pt = ring[i]!;
@@ -1034,12 +1031,7 @@ function traceRings(
   }
 }
 
-function drawGeometry(
-  ctx: CanvasRenderingContext2D,
-  geom: GeoJSON.Geometry | null,
-  w: number,
-  h: number,
-): void {
+function drawGeometry(ctx: Context2D, geom: GeoJSON.Geometry | null, w: number, h: number): void {
   if (!geom) return;
   if (geom.type === 'Polygon') {
     ctx.beginPath();
@@ -1095,7 +1087,7 @@ function horizontalLerp(row: Float32Array, tab: UpTable, x: number): number {
 }
 
 /** Earth from Natural Earth land polygons (GeoJSON, lon/lat degrees). */
-export function earthTexture(land: GeoJSON.FeatureCollection, width = 2048): HTMLCanvasElement {
+export function earthTexture(land: GeoJSON.FeatureCollection, width = 2048): TextureCanvas {
   const [w, h] = earthSize(width);
   const { canvas, ctx } = makeCanvas(w, h);
   if (!ctx) return canvas;
@@ -1247,7 +1239,7 @@ function ringAt(o: Out, r: number, n: Noise3): void {
 }
 
 /** 1024 x 1 RGBA strip, left = inner radius 74,658 km, right = outer radius 136,775 km. */
-export function saturnRingTexture(): HTMLCanvasElement {
+export function saturnRingTexture(): TextureCanvas {
   const w = 1024;
   const { canvas, ctx } = makeCanvas(w, 1);
   if (!ctx) return canvas;
@@ -1290,7 +1282,7 @@ const CORE_WARM: RGB = [255, 228, 188];
 const ARM_BLUE: RGB = [196, 210, 240];
 
 /** 256 x 256 RGBA on a transparent background. */
-export function galaxyTexture(morph: GalaxyMorph, seed: number): HTMLCanvasElement {
+export function galaxyTexture(morph: GalaxyMorph, seed: number): TextureCanvas {
   const S = 256;
   const { canvas, ctx } = makeCanvas(S, S);
   if (!ctx) return canvas;

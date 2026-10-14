@@ -8,6 +8,7 @@ import {
   describeView,
   formatDistance,
   formatLightTime,
+  handoverRange,
   homeOuterFor,
   localScaleName,
   minOuterFor,
@@ -65,12 +66,21 @@ describe('scales', () => {
   });
 
   it('looks at the focus close in, the Sun further out, then the Galactic Centre', () => {
-    const focus = [1, 0, 0] as const;
+    const focus = [M_PER_AU, 0, 0] as const;
     const sun = [0, 0, 0] as const;
-    const centre = [0, 9, 0] as const;
-    expect(targetFor(8, focus, sun, centre)).toEqual([1, 0, 0]);
+    const centre = [0, 26_000 * M_PER_LY, 0] as const;
+    expect(targetFor(9, focus, sun, centre)).toEqual([M_PER_AU, 0, 0]);
     expect(targetFor(15, focus, sun, centre)).toEqual([0, 0, 0]);
-    expect(targetFor(24, focus, sun, centre)).toEqual([0, 9, 0]);
+    expect(targetFor(24, focus, sun, centre)).toEqual([0, 26_000 * M_PER_LY, 0]);
+  });
+
+  it('slides between targets only while both stay on screen', () => {
+    const [start, end] = handoverRange(M_PER_AU);
+    // Gap as a share of the camera distance at the start and end of the slide.
+    expect(M_PER_AU / 10 ** start).toBeCloseTo(0.63, 2);
+    expect(M_PER_AU / 10 ** end).toBeCloseTo(0.16, 2);
+    // Earth's slide happens well above the Earth and Moon home view.
+    expect(start).toBeGreaterThan(SCALES[0]!.home + 2);
   });
 });
 
