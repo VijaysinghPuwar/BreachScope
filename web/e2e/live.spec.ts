@@ -221,6 +221,8 @@ test('a Cloudflare Radar country pair shows as a pair, never as points', async (
   const row = page.locator('[data-uid="radar-us-de"]');
   await expect(row).toContainText('United States → Germany');
   await expect(row).toContainText('12.5% of attack traffic');
+  // A country pair has no exact ends, so the map draws no arc for it.
+  await expect(page.getByTestId('map-canvas')).toHaveAttribute('data-arcs', '0');
   expect(errors).toEqual([]);
 });
 
@@ -263,5 +265,7 @@ test('honeypot telemetry renders with its provenance', async ({ page }) => {
   await page.locator('[data-uid="sensor-hit"]').click();
   await expect(page.getByText('Direct observation on owned sensor')).toBeVisible();
   await expect(page.getByText('Own data').first()).toBeVisible();
+  // Both ends are exact, so the arc is drawn without any opt-in.
+  await expect(page.getByTestId('map-canvas')).toHaveAttribute('data-arcs', '1');
   expect(errors).toEqual([]);
 });

@@ -1,6 +1,6 @@
 export type Projection = 'Flat' | 'Globe';
 export const layerDefinitions = [
-  ['arcs', 'Arcs', 'TEL, AGG'],
+  ['arcs', 'Arcs', 'Exact source and target'],
   ['points', 'Points', 'TEL sources, IOC'],
   ['density', 'Hex density', 'Events per cell'],
   ['sensors', 'Sensors', 'Configured coordinates'],
@@ -17,7 +17,8 @@ export const defaultLayers: Layers = {
   sensors: true,
   accuracy: true,
   borders: true,
-  graticule: true,
+  // Off by default: seen from a pole the grid reads as a radar dish.
+  graticule: false,
 };
 export interface MapActions {
   zoom(delta: number): void;

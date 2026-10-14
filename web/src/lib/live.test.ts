@@ -82,6 +82,30 @@ describe('live data contract', () => {
     expect(mapFeatures([kev]).features).toHaveLength(0);
     expect(mapFeatures(events).features.some((f) => f.properties?.kind === 'arc')).toBe(false);
   });
+  it('never draws a country pair, which has no exact ends', () => {
+    const pair = toObservation({
+      seq: 0,
+      event_uid: 'radar-us-de',
+      source: 'Cloudflare Radar',
+      data_class: 'aggregate_telemetry',
+      licence: 'CC BY-NC 4.0',
+      category: 'l7_attack_pair',
+      category_label: 'L7 attacks (country pair)',
+      severity: 3,
+      confidence_basis: 'Cloudflare Radar',
+      ingested_at: '2026-10-14T00:00:00Z',
+      geo_method: 'country_centroid',
+      src_country: 'US',
+      dst_country: 'DE',
+      src_lat: 39.887,
+      src_lon: -98.807,
+      dst_lat: 51.038,
+      dst_lon: 10.351,
+      attrs: { share_percent: 12.5 },
+    } as Parameters<typeof toObservation>[0]);
+    expect(pair.pair).not.toBeNull();
+    expect(mapFeatures([pair]).features).toHaveLength(0);
+  });
   it('uses the published radius in km, including coordinates at zero', () => {
     const point = circlePolygon([0, 0], 50).coordinates[0]![0]!;
     expect(((point[1]! * Math.PI) / 180) * earthRadiusKm).toBeCloseTo(50);

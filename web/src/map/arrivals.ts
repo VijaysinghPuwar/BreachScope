@@ -6,7 +6,7 @@ import type { Observation } from '../data/events';
 /** How long one arrival ripple takes to spread and fade. */
 export const RING_MS = 2600;
 /** How far a ripple spreads over the Earth's surface before it is gone. */
-const RIPPLE_KM = 2500;
+const RIPPLE_KM = 600;
 /** Cap on ripples drawn at once, so a burst of arrivals stays smooth. */
 const MAX_ACTIVE = 8;
 /** On first load the most recent located events replay this far apart. */

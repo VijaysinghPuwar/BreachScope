@@ -4,7 +4,7 @@ import { Banner, Button, Chip, EmptyState } from './ui';
 const classDescriptions = [
   'Synthetic data for demos and load tests. Off by default. When it is on, the top bar says Simulated data visible, and its arcs are dashed.',
   'Seen on a sensor we run: sensor-eus1, a Cowrie honeypot. The only data drawn as an arc from a source to our sensor.',
-  'A third party’s aggregated observations, from Cloudflare Radar. Drawn as country-to-country arcs because the source provides the pair, thicker with volume.',
+  'A third party’s aggregated observations, from Cloudflare Radar. Listed in the feed as country pairs with their share of traffic. Never drawn on the map, because the source names countries, not exact places.',
   'Reported as malicious by ThreatFox, URLhaus or Spamhaus DROP. A point or a hex on the map, never an arc.',
   'An entry in the CISA KEV catalogue. Not geographic: a tick on the timeline and a row in Reports.',
   'A confirmed public disclosure. Not geographic: a tick on the timeline and a row in Reports.',
@@ -102,8 +102,9 @@ function About() {
           <code>configured · Azure East US</code>. It is never a street address.
         </li>
         <li>
-          Arcs are drawn only when the source provides both ends: our own honeypot, and Cloudflare
-          Radar&apos;s country pairs.
+          Arcs are drawn only when both ends are exact: an attacker&apos;s located address and our
+          own honeypot. Cloudflare Radar names countries, not places, so its country pairs are
+          listed in the feed and never drawn on the map.
         </li>
       </ul>
       <h2>Sources and licences</h2>

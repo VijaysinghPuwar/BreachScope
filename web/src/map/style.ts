@@ -45,6 +45,10 @@ export function mapStyle(projection: Projection): StyleSpecification {
       observations: { type: 'geojson', data: empty },
       selection: { type: 'geojson', data: empty },
       arrivals: { type: 'geojson', data: empty },
+      // Arcs live in their own source so they can be re-clipped to the
+      // visible hemisphere cheaply as the globe turns.
+      'arc-lines': { type: 'geojson', data: empty },
+      'arc-heads': { type: 'geojson', data: empty },
       sensor: {
         type: 'geojson',
         data: useSample
@@ -79,7 +83,7 @@ export function mapStyle(projection: Projection): StyleSpecification {
         id: 'graticule',
         type: 'line',
         source: 'graticule',
-        paint: { 'line-color': token('--border-subtle'), 'line-width': 0.5 },
+        paint: { 'line-color': token('--border-subtle'), 'line-width': 0.5, 'line-opacity': 0.5 },
       },
       {
         id: 'land',
@@ -140,21 +144,40 @@ export function mapStyle(projection: Projection): StyleSpecification {
       {
         id: 'arcs',
         type: 'line',
-        source: 'observations',
+        source: 'arc-lines',
         filter: ['==', 'kind', 'arc'],
         paint: {
           'line-color': severityColor,
-          'line-opacity': 0.8,
-          // Country-pair arcs are thicker with a larger share of the traffic.
-          'line-width': [
-            'interpolate',
-            ['linear'],
-            ['coalesce', ['get', 'share'], 0],
-            0,
-            1.25,
-            15,
-            4,
-          ],
+          // A faint path; the moving trail on top shows direction.
+          'line-opacity': 0.45,
+          'line-width': 1.25,
+        },
+      },
+      {
+        // The moving head that shows each arc's direction (see arcFlow.ts).
+        id: 'arc-heads',
+        type: 'line',
+        source: 'arc-heads',
+        filter: ['==', ['geometry-type'], 'LineString'],
+        layout: { 'line-cap': 'round' },
+        paint: {
+          'line-color': severityColor,
+          'line-width': 2.5,
+          'line-opacity': ['coalesce', ['get', 'fade'], 1],
+        },
+      },
+      {
+        // The tip of each moving trail.
+        id: 'arc-tips',
+        type: 'circle',
+        source: 'arc-heads',
+        filter: ['==', ['geometry-type'], 'Point'],
+        paint: {
+          'circle-radius': 3,
+          'circle-color': severityColor,
+          'circle-stroke-width': 1,
+          'circle-stroke-color': token('--bg-base'),
+          'circle-pitch-alignment': 'map',
         },
       },
       {

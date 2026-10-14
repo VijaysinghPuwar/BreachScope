@@ -83,22 +83,9 @@ export function splitAntimeridian(points: Position[]): MultiLineString {
 export function mapFeatures(events: Observation[]): FeatureCollection {
   const features: Feature[] = [];
   for (const event of events) {
-    // A country pair is drawn as one arc between centroids, never as points:
-    // the source names countries, not places inside them.
-    if (event.pair) {
-      features.push({
-        type: 'Feature',
-        properties: {
-          uid: event.event_uid,
-          severity: event.severity,
-          data_class: event.data_class,
-          share: event.pair.share,
-          kind: 'arc',
-        },
-        geometry: greatCircle(event.pair.from, event.pair.to),
-      });
-      continue;
-    }
+    // A country pair names two countries, not places, so it has no exact
+    // ends to draw. It is listed in the feed and never put on the map.
+    if (event.pair) continue;
     if (
       !event.coordinates ||
       countryOnly(event) ||
@@ -118,7 +105,9 @@ export function mapFeatures(events: Observation[]): FeatureCollection {
       properties: { ...properties, kind: 'point' },
       geometry: { type: 'Point', coordinates: event.coordinates },
     });
-    if (event.geo_accuracy_km) {
+    // A country centroid already shades the whole country; a ring the size of
+    // the country would only add a huge circle.
+    if (event.geo_accuracy_km && !properties.countryOnly) {
       const circle = circlePolygon(event.coordinates, event.geo_accuracy_km);
       features.push({
         type: 'Feature',
@@ -157,5 +146,53 @@ export function graticule(): FeatureCollection<LineString> {
         coordinates: Array.from({ length: 171 }, (_, i) => [longitude, i - 85]),
       },
     });
+  return { type: 'FeatureCollection', features };
+}
+
+/** Great-circle angle between two lon/lat points, in degrees. */
+function angleBetween([lon1, lat1]: Position, [lon2, lat2]: Position) {
+  const r = Math.PI / 180;
+  const cos =
+    Math.sin(lat1 * r) * Math.sin(lat2 * r) +
+    Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.cos((lon2 - lon1) * r);
+  return Math.acos(Math.max(-1, Math.min(1, cos))) / r;
+}
+
+/**
+ * Keeps only the parts of lines and points on the visible half of the globe.
+ * MapLibre hides circles behind the globe but draws lines straight through,
+ * so far-side stretches of long arcs would float past the edge.
+ */
+export function clipToHemisphere(
+  collection: FeatureCollection,
+  center: Position,
+  limitDeg = 88,
+): FeatureCollection {
+  const visible = (p: Position) => angleBetween(p, center) <= limitDeg;
+  const features: Feature[] = [];
+  for (const feature of collection.features) {
+    const g = feature.geometry;
+    if (g.type === 'Point') {
+      if (visible(g.coordinates as Position)) features.push(feature);
+    } else if (g.type === 'MultiLineString' || g.type === 'LineString') {
+      const lines = g.type === 'LineString' ? [g.coordinates] : g.coordinates;
+      const kept: Position[][] = [];
+      for (const line of lines) {
+        let run: Position[] = [];
+        for (const p of line as Position[]) {
+          if (visible(p)) run.push(p);
+          else if (run.length) {
+            if (run.length > 1) kept.push(run);
+            run = [];
+          }
+        }
+        if (run.length > 1) kept.push(run);
+      }
+      if (kept.length)
+        features.push({ ...feature, geometry: { type: 'MultiLineString', coordinates: kept } });
+    } else {
+      features.push(feature);
+    }
+  }
   return { type: 'FeatureCollection', features };
 }

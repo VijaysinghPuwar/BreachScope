@@ -36,7 +36,7 @@ var centroids = func() map[string][2]float32 {
 }()
 
 const radarURL = "https://api.cloudflare.com/client/v4/radar/attacks/layer7/top/attacks" +
-	"?limit=40&dateRange=1d&limitDirection=ORIGIN&limitPerLocation=3&format=JSON"
+	"?limit=20&dateRange=1d&limitDirection=ORIGIN&limitPerLocation=3&format=JSON"
 
 // radarSource is enabled only when CLOUDFLARE_API_TOKEN is set.
 func radarSource() (Source, bool) {

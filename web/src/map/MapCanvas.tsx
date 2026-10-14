@@ -10,7 +10,8 @@ import {
 import 'maplibre-gl/dist/maplibre-gl.css';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { eventTime, severityLabels, utc, type Observation } from '../data/events';
-import { mapFeatures } from '../lib/geometry';
+import { clipToHemisphere, mapFeatures } from '../lib/geometry';
+import type { FeatureCollection } from 'geojson';
 import { sensor } from '../data/events';
 import { useSample } from '../lib/api';
 import { countryCodes, countryOnly, locationLabel } from '../lib/location';
@@ -18,6 +19,7 @@ import { Banner, Button } from '../components/ui';
 import { mapStyle } from './style';
 import type { Layers, MapActions, Projection } from './types';
 import { ArrivalRings } from './arrivals';
+import { ArcFlow } from './arcFlow';
 setWorkerUrl(workerUrl);
 interface Props {
   projection: Projection;
@@ -40,6 +42,21 @@ export default function MapCanvas(props: Props) {
   const current = useRef(props);
   const [ready, setReady] = useState(false);
   const arrivals = useRef<ArrivalRings | null>(null);
+  const flow = useRef<ArcFlow | null>(null);
+  const arcData = useRef<FeatureCollection>({ type: 'FeatureCollection', features: [] });
+  // Pushes the arcs to the map, cut to the visible half of the globe.
+  const drawArcs = (instance: Map) => {
+    const center = instance.getCenter();
+    const data =
+      current.current.projection === 'Globe'
+        ? clipToHemisphere(arcData.current, [center.lng, center.lat])
+        : arcData.current;
+    (instance.getSource('arc-lines') as GeoJSONSource | undefined)?.setData(data);
+    // How many arcs are drawn, for tests and for anyone inspecting the page.
+    container.current?.setAttribute('data-arcs', String(arcData.current.features.length));
+    flow.current ??= new ArcFlow(instance, () => current.current.reducedMotion);
+    flow.current.update(data);
+  };
   const [failed, setFailed] = useState(false);
   const [hover, setHover] = useState<Observation | null>(null);
   useEffect(() => {
@@ -114,6 +131,15 @@ export default function MapCanvas(props: Props) {
       });
       instance.on('load', () => {
         if (disposed) return;
+        // Re-clip the arcs as the globe turns, at most once per frame.
+        let pending = 0;
+        instance.on('move', () => {
+          if (pending) return;
+          pending = requestAnimationFrame(() => {
+            pending = 0;
+            drawArcs(instance);
+          });
+        });
         const findEvent = (event: MapMouseEvent) => {
           const radius = current.current.mobile ? 24 : 8;
           const points = instance.queryRenderedFeatures(
@@ -181,6 +207,8 @@ export default function MapCanvas(props: Props) {
       disposed = true;
       observer.disconnect();
       arrivals.current?.destroy();
+      flow.current?.stop();
+      flow.current = null;
       arrivals.current = null;
       instance.remove();
       map.current = null;
@@ -190,7 +218,10 @@ export default function MapCanvas(props: Props) {
     const instance = map.current;
     if (!ready || !instance) return;
     const type = props.projection === 'Flat' ? 'mercator' : 'globe';
-    const cancel = whenStyleReady(instance, () => instance.setProjection({ type }));
+    const cancel = whenStyleReady(instance, () => {
+      instance.setProjection({ type });
+      drawArcs(instance);
+    });
     if (!props.reducedMotion)
       instance.getCanvas().animate([{ opacity: 0.65 }, { opacity: 1 }], { duration: 600 });
     return cancel;
@@ -210,9 +241,14 @@ export default function MapCanvas(props: Props) {
             }
           : { type: 'FeatureCollection', features: [] },
       );
-      (instance.getSource('observations') as GeoJSONSource | undefined)?.setData(
-        mapFeatures(props.events),
-      );
+      const all = mapFeatures(props.events);
+      const arcs = all.features.filter((f) => f.properties?.kind === 'arc');
+      arcData.current = { type: 'FeatureCollection', features: arcs };
+      (instance.getSource('observations') as GeoJSONSource | undefined)?.setData({
+        type: 'FeatureCollection',
+        features: all.features.filter((f) => f.properties?.kind !== 'arc'),
+      });
+      drawArcs(instance);
       arrivals.current ??= new ArrivalRings(instance, () => current.current.reducedMotion);
       arrivals.current.update(props.events);
       const countries = countryCodes(props.events);
@@ -220,6 +256,8 @@ export default function MapCanvas(props: Props) {
         instance.setFilter(layer, ['in', ['get', 'iso_a2'], ['literal', countries]]);
       const visibility = {
         arcs: props.layers.arcs,
+        'arc-heads': props.layers.arcs,
+        'arc-tips': props.layers.arcs,
         points: props.layers.points,
         'location-labels': props.layers.points,
         'country-shading': props.layers.points,
