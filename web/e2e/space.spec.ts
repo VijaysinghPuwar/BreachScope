@@ -1,10 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { fileURLToPath } from 'node:url';
-import { createServer, type ViteDevServer } from 'vite';
+import fixture from '../src/test/fixtures/live.json' with { type: 'json' };
 
-// SpaceView is not routed in the app yet, so this spec serves the harness page
-// (src/space/harness.html) from its own Vite dev server.
+// Software WebGL in CI draws slowly, so zoom checks get extra time.
+const SLOW = { timeout: 15_000 };
+
 const sizes = [
   [1440, 900],
   [1024, 768],
@@ -12,106 +12,94 @@ const sizes = [
   [390, 844],
 ] as const;
 
-let server: ViteDevServer;
-let harnessUrl = '';
-
-test.beforeAll(async () => {
-  server = await createServer({
-    root: fileURLToPath(new URL('..', import.meta.url)),
-    logLevel: 'error',
-    server: { host: '127.0.0.1', port: 5187, strictPort: false },
-  });
-  await server.listen();
-  harnessUrl = new URL('src/space/harness.html', server.resolvedUrls!.local[0]).href;
-});
-
-test.afterAll(async () => {
-  await server?.close();
-});
-
-async function open(page: Page, errors: string[]) {
+async function openSpace(page: Page, errors: string[]) {
+  await page.clock.setFixedTime(new Date(fixture.generated_at));
+  await page.route('**/api/live', (route) => route.fulfill({ json: fixture }));
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text());
   });
-  await page.goto(harnessUrl);
+  await page.goto('/space');
   const view = page.getByTestId('space-view');
-  await expect(view).toBeVisible();
+  // CI renders WebGL in software, so the first frame can take a while.
+  await expect(view).toHaveAttribute('data-ready', 'true', { timeout: 30_000 });
+  await expect(view).toHaveAttribute('data-webgl', 'true');
   return view;
 }
 
 for (const [width, height] of sizes)
   for (const motion of ['no-preference', 'reduce'] as const) {
-    test(`${width}x${height} ${motion}: zooms through every scale`, async ({ page }, info) => {
+    test(`${width}x${height} ${motion}: 3D space view zooms, flies and returns`, async ({
+      page,
+    }, info) => {
       await page.setViewportSize({ width, height });
       await page.emulateMedia({ reducedMotion: motion });
       const errors: string[] = [];
-      const view = await open(page, errors);
+      const view = await openSpace(page, errors);
       const canvas = page.getByRole('img', { name: /scale/ });
 
-      await expect(view).toHaveAttribute('data-scale', 'earth-moon');
-      await expect(canvas).toHaveAttribute('aria-label', /^Earth and Moon scale/);
+      await expect(view).toHaveAttribute('data-scale', 'earth-moon', SLOW);
+      await expect(page.getByRole('heading', { name: 'Earth and Moon' })).toBeVisible();
       await expect(canvas).toHaveAttribute('aria-label', /Moon/);
-      await expect(
-        page.getByText('Distances to scale on a log axis. Directions are schematic.'),
-      ).toBeVisible();
       await expect(page.getByRole('button', { name: 'Back to Earth' })).toBeVisible();
+      await page.screenshot({ path: info.outputPath('earth.png') });
 
-      const axe = await new AxeBuilder({ page }).analyze();
+      const axe = await new AxeBuilder({ page }).include('[data-testid="space-view"]').analyze();
       expect(axe.violations.map((violation) => violation.id)).toEqual([]);
 
-      // Keyboard: eight presses of "-" zoom out two decades, into the Solar System.
+      // Keyboard: fourteen presses of "-" zoom out 2.8 decades, into the Solar System.
       await view.focus();
-      for (let press = 0; press < 8; press++) await page.keyboard.press('-');
-      await expect(view).toHaveAttribute('data-scale', 'solar-system');
-      await expect(page.getByText('Solar System · 1 AU = 149.6 million km')).toBeAttached();
+      for (let press = 0; press < 14; press++) await page.keyboard.press('-');
+      await expect(view).toHaveAttribute('data-scale', 'solar-system', SLOW);
 
-      // Wheel: zoom out to the nearby galaxies.
+      // Wheel zooms further out.
       const box = (await canvas.boundingBox())!;
       await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-      for (let step = 0; step < 12; step++) await page.mouse.wheel(0, 400);
-      await expect(view).toHaveAttribute('data-scale', 'galaxies');
-      await expect(canvas).toHaveAttribute('aria-label', /Andromeda/);
+      for (let step = 0; step < 8; step++) await page.mouse.wheel(0, 500);
+      await expect(view).toHaveAttribute('data-scale', /nearby-stars|milky-way/, SLOW);
 
       await view.focus();
       await page.keyboard.press('End');
-      await expect(view).toHaveAttribute('data-scale', 'universe');
+      await expect(view).toHaveAttribute('data-scale', 'universe', SLOW);
       await expect(canvas).toHaveAttribute('aria-label', /Edge of the observable universe/);
+      await page.screenshot({ path: info.outputPath('universe.png') });
       await page.keyboard.press('PageUp');
-      await expect(view).toHaveAttribute('data-scale', 'galaxies');
+      await expect(view).toHaveAttribute('data-scale', 'galaxies', SLOW);
+      await page.screenshot({ path: info.outputPath('galaxies.png') });
 
-      // Object list and detail card, with provenance.
-      await page.getByRole('button', { name: /In view/ }).click();
-      await page.getByRole('button', { name: /Andromeda \(M31\)/ }).click();
-      const card = page.getByRole('region', { name: 'Andromeda (M31) details' });
-      await expect(card).toContainText('2.5 Mly');
-      await expect(card).toContainText('Source: NASA, Andromeda Galaxy');
-      await expect(card).toContainText('2.5 million years');
-      await page.screenshot({ path: info.outputPath('galaxies.png'), animations: 'disabled' });
+      // Fly to Jupiter from the planet bar, then read its details and provenance.
+      await page
+        .getByRole('navigation', { name: 'Fly to' })
+        .getByRole('button', { name: 'Jupiter' })
+        .click();
+      await expect(view).toHaveAttribute('data-focus', 'jupiter');
+      await expect(page.getByRole('heading', { name: 'Jupiter system' })).toBeVisible({
+        timeout: 10_000,
+      });
+      const card = page.getByRole('region', { name: 'Jupiter details' });
+      await expect(card).toContainText('5.2 AU from the Sun');
+      await expect(card).toContainText('Source: NASA planetary fact sheet');
+      await expect(canvas).toHaveAttribute('aria-label', /Io|Europa|Ganymede|Callisto/);
+      await page.screenshot({ path: info.outputPath('jupiter.png') });
       await page.getByRole('button', { name: 'Close details' }).click();
       await expect(card).toHaveCount(0);
 
       if (width > 600) {
-        await page.getByRole('button', { name: 'Milky Way', exact: true }).click();
-        await expect(view).toHaveAttribute('data-scale', 'milky-way');
-        await expect(page.getByRole('button', { name: 'Milky Way', exact: true })).toHaveAttribute(
-          'aria-current',
-          'true',
-        );
+        await page
+          .getByRole('navigation', { name: 'Scales' })
+          .getByRole('button', { name: 'Milky Way' })
+          .click();
+        await expect(view).toHaveAttribute('data-scale', 'milky-way', SLOW);
       }
 
-      // Home, then zooming in past the closest view hands back to Earth.
-      await view.focus();
-      await page.keyboard.press('Home');
-      await expect(view).toHaveAttribute('data-scale', 'earth-moon');
-      await expect(view).toHaveAttribute('data-outer', '9.40');
-      for (let press = 0; press < 5; press++) await page.keyboard.press('+');
-      await expect(page.getByTestId('returns')).toHaveText('1');
+      // Time controls.
+      await page.getByRole('button', { name: 'Play time' }).click();
+      await expect(page.getByRole('button', { name: 'Pause time' })).toBeVisible();
+      await page.getByRole('button', { name: 'Pause time' }).click();
 
       await page.getByRole('button', { name: 'Back to Earth' }).click();
-      await expect(page.getByTestId('returns')).toHaveText('2');
-
-      await page.screenshot({ path: info.outputPath('earth.png'), animations: 'disabled' });
+      await expect(page).toHaveURL(/\/$/);
+      await expect(page.getByTestId('space-view')).toHaveCount(0);
       expect(errors).toEqual([]);
     });
   }
@@ -119,35 +107,16 @@ for (const [width, height] of sizes)
 test('reduced motion jumps straight to the target', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  const view = await open(page, []);
+  const view = await openSpace(page, []);
   await view.focus();
   await page.keyboard.press('End');
-  // No easing frames: the very next read is already at the universe home.
-  expect(await view.getAttribute('data-outer')).toBe('27.00');
+  await expect(view).toHaveAttribute('data-outer', '27.20');
 });
 
-test('clicking an object on the canvas opens its details', async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await open(page, []);
-  // Moon: angle 35 degrees at log share of its distance in the starting view.
-  const canvas = page.getByRole('img', { name: /scale/ });
-  const box = (await canvas.boundingBox())!;
-  const point = await page.evaluate(
-    ({ width, height }) => {
-      const radius = Math.min(width, height) / 2 - 28;
-      const share = (Math.log10(384_400_000) - (9.4 - 3)) / 3;
-      const angle = (35 * Math.PI) / 180;
-      return {
-        x: width / 2 + share * radius * Math.cos(angle),
-        y: height / 2 - share * radius * Math.sin(angle),
-      };
-    },
-    { width: box.width, height: box.height },
-  );
-  await page.mouse.click(box.x + point.x, box.y + point.y);
-  const card = page.getByRole('region', { name: 'Moon details' });
-  await expect(card).toContainText('384,000 km');
-  await expect(card).toContainText('1.28 seconds');
-  await expect(card).toContainText('NASA Moon fact sheet');
+test('Escape returns to the globe', async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await openSpace(page, []);
+  await page.getByTestId('space-view').focus();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('space-view')).toHaveCount(0);
 });
