@@ -380,7 +380,8 @@
   .hint {
     display: none;
   }
+  /* Clear the planet bar, time controls and the wrapped note below. */
   .side {
-    bottom: 176px;
+    bottom: 272px;
   }
 }
