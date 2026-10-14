@@ -234,3 +234,32 @@ func TestParseHIBP(t *testing.T) {
 		t.Errorf("leaked passwords should be critical and unverified should be 50: %+v", bank)
 	}
 }
+
+func TestParseRadarDrawsCountryPairs(t *testing.T) {
+	evs := must(parseRadar(fixture(t, "radar.json"), nil, testNow))
+	if len(evs) != 2 {
+		t.Fatalf("kept %d pairs, want 2 (unknown country and same-country pair dropped)", len(evs))
+	}
+	us := evs[0]
+	if *us.SrcCountry != "US" || *us.DstCountry != "DE" || us.Severity != 3 {
+		t.Errorf("first pair: %+v", us)
+	}
+	if us.SrcLat == nil || us.DstLat == nil || us.GeoMethod != MethodCountryCentroid {
+		t.Error("a country pair must carry both ends, marked as country centroids")
+	}
+	if us.Attrs["share_percent"] != 12.5 {
+		t.Errorf("share %v", us.Attrs["share_percent"])
+	}
+}
+
+func TestRadarNeedsAToken(t *testing.T) {
+	t.Setenv("CLOUDFLARE_API_TOKEN", "")
+	if _, ok := radarSource(); ok {
+		t.Fatal("radar enabled without a token")
+	}
+	t.Setenv("CLOUDFLARE_API_TOKEN", "test-token")
+	src, ok := radarSource()
+	if !ok || src.Header["Authorization"] != "Bearer test-token" {
+		t.Fatalf("radar source %+v", src)
+	}
+}

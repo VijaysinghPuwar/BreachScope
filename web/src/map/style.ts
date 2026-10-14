@@ -142,7 +142,20 @@ export function mapStyle(projection: Projection): StyleSpecification {
         type: 'line',
         source: 'observations',
         filter: ['==', 'kind', 'arc'],
-        paint: { 'line-color': severityColor, 'line-width': 1.25 },
+        paint: {
+          'line-color': severityColor,
+          'line-opacity': 0.8,
+          // Country-pair arcs are thicker with a larger share of the traffic.
+          'line-width': [
+            'interpolate',
+            ['linear'],
+            ['coalesce', ['get', 'share'], 0],
+            0,
+            1.25,
+            15,
+            4,
+          ],
+        },
       },
       {
         id: 'accuracy',

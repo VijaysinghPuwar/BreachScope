@@ -83,6 +83,22 @@ export function splitAntimeridian(points: Position[]): MultiLineString {
 export function mapFeatures(events: Observation[]): FeatureCollection {
   const features: Feature[] = [];
   for (const event of events) {
+    // A country pair is drawn as one arc between centroids, never as points:
+    // the source names countries, not places inside them.
+    if (event.pair) {
+      features.push({
+        type: 'Feature',
+        properties: {
+          uid: event.event_uid,
+          severity: event.severity,
+          data_class: event.data_class,
+          share: event.pair.share,
+          kind: 'arc',
+        },
+        geometry: greatCircle(event.pair.from, event.pair.to),
+      });
+      continue;
+    }
     if (
       !event.coordinates ||
       countryOnly(event) ||

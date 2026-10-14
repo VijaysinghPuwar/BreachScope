@@ -12,6 +12,10 @@ function subject(event: Observation) {
     const records = Number(event.attrs?.records ?? 0).toLocaleString('en-US');
     return `${event.attrs?.organisation ?? event.src} · ${records} accounts`;
   }
+  if (event.pair)
+    return `${event.attrs?.origin_name} → ${event.attrs?.target_name} · ${Number(
+      event.attrs?.share_percent ?? 0,
+    ).toFixed(1)}% of attack traffic`;
   if (event.data_class === 'KEV')
     return [event.attrs?.cve, event.attrs?.vendor].filter(Boolean).join(' · ');
   const place = [event.attrs?.city, event.country].filter(Boolean).join(', ');

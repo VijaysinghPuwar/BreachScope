@@ -17,6 +17,8 @@ export interface Observation {
   country: string | null;
   country_code: string | null;
   coordinates: Position | null;
+  /** Both ends of a country-level pair (Cloudflare Radar), centroid to centroid. */
+  pair?: { from: Position; to: Position; share: number } | null;
   geo_method:
     | LiveEvent['geo_method']
     | 'GeoLite2 City'

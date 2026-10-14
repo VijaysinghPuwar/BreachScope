@@ -60,6 +60,16 @@ func Default() []Source {
 	}
 }
 
+// Enabled returns the default sources plus any that need a key the
+// deployment has (Cloudflare Radar needs CLOUDFLARE_API_TOKEN).
+func Enabled() []Source {
+	sources := Default()
+	if radar, ok := radarSource(); ok {
+		sources = append(sources, radar)
+	}
+	return sources
+}
+
 // base fills the fields every event shares.
 func base(src Source, id string, now time.Time) store.Event {
 	return store.Event{

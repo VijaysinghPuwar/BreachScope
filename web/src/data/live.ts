@@ -28,7 +28,10 @@ export interface LiveEvent {
   src_country?: string;
   src_lat?: number;
   src_lon?: number;
-  geo_method: 'dbip_city_lite' | 'dbip_country' | 'feed_country' | 'none';
+  geo_method: 'dbip_city_lite' | 'dbip_country' | 'feed_country' | 'country_centroid' | 'none';
+  dst_country?: string;
+  dst_lat?: number;
+  dst_lon?: number;
   geo_accuracy_km?: number;
   attrs?: Record<string, string | number | boolean>;
 }
@@ -70,6 +73,15 @@ export function toObservation(raw: LiveEvent): Observation {
       Number.isFinite(raw.src_lat) &&
       Number.isFinite(raw.src_lon)
         ? [raw.src_lon!, raw.src_lat!]
+        : null,
+    pair:
+      raw.geo_method === 'country_centroid' &&
+      [raw.src_lat, raw.src_lon, raw.dst_lat, raw.dst_lon].every(Number.isFinite)
+        ? {
+            from: [raw.src_lon!, raw.src_lat!],
+            to: [raw.dst_lon!, raw.dst_lat!],
+            share: Number(raw.attrs?.share_percent ?? 0),
+          }
         : null,
     geo_method: raw.geo_method,
     geo_accuracy_km: raw.geo_accuracy_km ?? null,

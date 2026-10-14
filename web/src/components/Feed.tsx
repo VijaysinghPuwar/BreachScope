@@ -26,13 +26,18 @@ export function FeedRow({
   const detail = (
     event.data_class === 'KEV'
       ? [event.attrs?.cve ?? event.src, event.attrs?.vendor, event.attrs?.product]
-      : event.data_class === 'BRCH'
+      : event.pair
         ? [
-            event.attrs?.organisation,
-            `${Number(event.attrs?.records ?? 0).toLocaleString('en-US')} accounts`,
-            event.attrs?.breach_date && `breached ${event.attrs.breach_date}`,
+            `${event.attrs?.origin_name} → ${event.attrs?.target_name}`,
+            `${Number(event.attrs?.share_percent ?? 0).toFixed(1)}% of attack traffic`,
           ]
-        : [event.src, event.asn, event.country_code, event.attrs?.malware]
+        : event.data_class === 'BRCH'
+          ? [
+              event.attrs?.organisation,
+              `${Number(event.attrs?.records ?? 0).toLocaleString('en-US')} accounts`,
+              event.attrs?.breach_date && `breached ${event.attrs.breach_date}`,
+            ]
+          : [event.src, event.asn, event.country_code, event.attrs?.malware]
   )
     .filter(Boolean)
     .join(' · ');

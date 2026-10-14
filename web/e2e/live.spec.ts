@@ -183,3 +183,43 @@ test.describe('leaving Earth for the space view', () => {
     await expect(page.getByTestId('map-canvas')).toHaveAttribute('data-ready', 'true');
   });
 });
+
+test('a Cloudflare Radar country pair shows as a pair, never as points', async ({ page }) => {
+  const pair = {
+    seq: 0,
+    event_uid: 'radar-us-de',
+    source: 'Cloudflare Radar',
+    data_class: 'aggregate_telemetry',
+    licence: 'CC BY-NC 4.0',
+    category: 'l7_attack_pair',
+    category_label: 'L7 attacks (country pair)',
+    severity: 3,
+    confidence_basis:
+      'Cloudflare Radar: 12.50% of mitigated layer 7 attack traffic in the last 24 h',
+    reported_at: fixture.generated_at,
+    ingested_at: fixture.generated_at,
+    geo_method: 'country_centroid',
+    src_country: 'US',
+    dst_country: 'DE',
+    src_lat: 39.887,
+    src_lon: -98.807,
+    dst_lat: 51.038,
+    dst_lon: 10.351,
+    attrs: { origin_name: 'United States', target_name: 'Germany', share_percent: 12.5 },
+  };
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.route('**/api/live', (route) =>
+    route.fulfill({ json: { ...fixture, events: [pair, ...fixture.events] } }),
+  );
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await expect(page.getByTestId('map-canvas')).toHaveAttribute('data-ready', 'true', {
+    timeout: 30_000,
+  });
+  await page.getByRole('button', { name: 'Open feed', exact: true }).click();
+  const row = page.locator('[data-uid="radar-us-de"]');
+  await expect(row).toContainText('United States → Germany');
+  await expect(row).toContainText('12.5% of attack traffic');
+  expect(errors).toEqual([]);
+});

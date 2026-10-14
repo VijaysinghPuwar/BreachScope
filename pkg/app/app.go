@@ -38,7 +38,7 @@ func Build(ctx context.Context, cfg config.Config, log *slog.Logger) (http.Handl
 		log.Warn("geoip unavailable, events will not be located", "err", err)
 		deps.GeoStatus = "missing: " + err.Error()
 	}
-	deps.Live = feeds.NewHub(feeds.Default(), &http.Client{Timeout: 30 * time.Second}, geo, log)
+	deps.Live = feeds.NewHub(feeds.Enabled(), &http.Client{Timeout: 30 * time.Second}, geo, log)
 
 	closeFn := func() {}
 	if cfg.DatabaseURL != "" {

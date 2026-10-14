@@ -33,11 +33,13 @@ const MaxEvents = 3000
 
 // Source describes one feed.
 type Source struct {
-	Name        string
-	DataClass   string
-	Licence     string
-	URL         string // human-facing home page
-	FeedURL     string // what we fetch
+	Name      string
+	DataClass string
+	Licence   string
+	URL       string // human-facing home page
+	FeedURL   string // what we fetch
+	// Header holds extra request headers, such as an API token.
+	Header      map[string]string
 	MinInterval time.Duration
 	// Parse turns the response body into events. now is the fetch time.
 	Parse func(body []byte, geo *geoip.DB, now time.Time) ([]store.Event, error)

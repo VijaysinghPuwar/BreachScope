@@ -22,6 +22,9 @@ func (h *Hub) fetch(ctx context.Context, s Source, lastModified, etag string, no
 	}
 	req.Header.Set("User-Agent", UserAgent)
 	req.Header.Set("Accept", "application/json")
+	for k, v := range s.Header {
+		req.Header.Set(k, v)
+	}
 	if lastModified != "" {
 		req.Header.Set("If-Modified-Since", lastModified)
 	}

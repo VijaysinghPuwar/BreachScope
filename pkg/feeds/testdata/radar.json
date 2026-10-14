@@ -1,0 +1,6 @@
+{"success":true,"result":{"meta":{"lastUpdated":"2026-10-14T21:00:00Z","dateRange":[{"startTime":"2026-10-13T21:00:00Z","endTime":"2026-10-14T21:00:00Z"}]},
+ "top_0":[
+  {"originCountryAlpha2":"US","originCountryName":"United States","targetCountryAlpha2":"DE","targetCountryName":"Germany","value":"12.5"},
+  {"originCountryAlpha2":"IN","originCountryName":"India","targetCountryAlpha2":"US","targetCountryName":"United States","value":"4.1"},
+  {"originCountryAlpha2":"XX","originCountryName":"Nowhere","targetCountryAlpha2":"US","targetCountryName":"United States","value":"1.0"},
+  {"originCountryAlpha2":"FR","originCountryName":"France","targetCountryAlpha2":"FR","targetCountryName":"France","value":"2.0"}]}}
