@@ -1,0 +1,4 @@
+{"generated_at":"2026-10-14T19:29:00+00:00","sensor":{"name":"sensor-eus1","region":"Azure East US"},"groups":[
+ {"src_ip":"8.8.8.8","protocol":"ssh","hour":"2026-10-14T19:00:00+00:00","first_seen":"2026-10-14T19:01:00+00:00","last_seen":"2026-10-14T19:20:00+00:00","sessions":3,"login_attempts":42,"login_successes":1,"commands":4,"top_usernames":["root","admin"]},
+ {"src_ip":"8.8.4.4","protocol":"telnet","hour":"2026-10-14T19:00:00+00:00","first_seen":"2026-10-14T19:05:00+00:00","last_seen":"2026-10-14T19:06:00+00:00","sessions":1,"login_attempts":3,"login_successes":0,"commands":0,"top_usernames":["guest"]},
+ {"src_ip":"not-an-ip","protocol":"ssh","hour":"x","first_seen":"x","last_seen":"x","sessions":1,"login_attempts":1,"login_successes":0,"commands":0,"top_usernames":[]}]}

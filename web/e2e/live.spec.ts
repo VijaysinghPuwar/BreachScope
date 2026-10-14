@@ -223,3 +223,45 @@ test('a Cloudflare Radar country pair shows as a pair, never as points', async (
   await expect(row).toContainText('12.5% of attack traffic');
   expect(errors).toEqual([]);
 });
+
+test('honeypot telemetry renders with its provenance', async ({ page }) => {
+  const hit = {
+    seq: 0,
+    event_uid: 'sensor-hit',
+    source: 'Cowrie (sensor-eus1)',
+    data_class: 'telemetry',
+    licence: 'Own data',
+    category: 'ssh_bruteforce',
+    category_label: 'SSH brute force',
+    severity: 3,
+    confidence: 100,
+    confidence_basis: 'Direct observation on owned sensor',
+    observed_at: fixture.generated_at,
+    reported_at: fixture.generated_at,
+    ingested_at: fixture.generated_at,
+    geo_method: 'dbip_city_lite',
+    src_ip: '198.51.100.23',
+    src_country: 'NL',
+    src_lat: 52.37,
+    src_lon: 4.89,
+    dst_sensor: 'sensor-eus1',
+    dst_lat: 37.3719,
+    dst_lon: -79.8164,
+    attrs: { city: 'Amsterdam', protocol: 'ssh', login_attempts: 42 },
+  };
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.route('**/api/live', (route) =>
+    route.fulfill({ json: { ...fixture, events: [hit, ...fixture.events] } }),
+  );
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/');
+  await expect(page.getByTestId('map-canvas')).toHaveAttribute('data-ready', 'true', {
+    timeout: 30_000,
+  });
+  await page.getByRole('button', { name: 'Open feed', exact: true }).click();
+  await page.locator('[data-uid="sensor-hit"]').click();
+  await expect(page.getByText('Direct observation on owned sensor')).toBeVisible();
+  await expect(page.getByText('Own data').first()).toBeVisible();
+  expect(errors).toEqual([]);
+});

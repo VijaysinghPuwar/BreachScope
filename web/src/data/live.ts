@@ -30,6 +30,7 @@ export interface LiveEvent {
   src_lon?: number;
   geo_method: 'dbip_city_lite' | 'dbip_country' | 'feed_country' | 'country_centroid' | 'none';
   dst_country?: string;
+  dst_sensor?: string;
   dst_lat?: number;
   dst_lon?: number;
   geo_accuracy_km?: number;
@@ -85,7 +86,7 @@ export function toObservation(raw: LiveEvent): Observation {
         : null,
     geo_method: raw.geo_method,
     geo_accuracy_km: raw.geo_accuracy_km ?? null,
-    dst: null,
+    dst: raw.dst_sensor ?? null,
     observed_at: raw.observed_at ?? null,
     reported_at: raw.reported_at ?? null,
     ingested_at: raw.ingested_at,

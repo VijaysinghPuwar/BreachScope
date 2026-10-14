@@ -11,6 +11,8 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import { eventTime, severityLabels, utc, type Observation } from '../data/events';
 import { mapFeatures } from '../lib/geometry';
+import { sensor } from '../data/events';
+import { useSample } from '../lib/api';
 import { countryCodes, countryOnly, locationLabel } from '../lib/location';
 import { Banner, Button } from '../components/ui';
 import { mapStyle } from './style';
@@ -197,6 +199,17 @@ export default function MapCanvas(props: Props) {
     const instance = map.current;
     if (!ready || !instance) return;
     return whenStyleReady(instance, () => {
+      // The sensor appears once it has reported something.
+      const sensorLive = props.events.some((e) => e.dst === sensor.name);
+      (instance.getSource('sensor') as GeoJSONSource | undefined)?.setData(
+        sensorLive || useSample
+          ? {
+              type: 'Feature',
+              properties: {},
+              geometry: { type: 'Point', coordinates: sensor.coordinates },
+            }
+          : { type: 'FeatureCollection', features: [] },
+      );
       (instance.getSource('observations') as GeoJSONSource | undefined)?.setData(
         mapFeatures(props.events),
       );
@@ -213,6 +226,7 @@ export default function MapCanvas(props: Props) {
         'country-approximation': props.layers.points,
         accuracy: props.layers.accuracy,
         sensor: props.layers.sensors,
+        'sensor-label': props.layers.sensors,
         borders: props.layers.borders,
         graticule: props.layers.graticule && props.projection === 'Globe',
       };

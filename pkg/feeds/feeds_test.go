@@ -2,11 +2,15 @@ package feeds
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -261,5 +265,66 @@ func TestRadarNeedsAToken(t *testing.T) {
 	src, ok := radarSource()
 	if !ok || src.Header["Authorization"] != "Bearer test-token" {
 		t.Fatalf("radar source %+v", src)
+	}
+}
+
+func signed(secret, body []byte, at time.Time) http.Header {
+	stamp := strconv.FormatInt(at.Unix(), 10)
+	mac := hmac.New(sha256.New, secret)
+	mac.Write([]byte(stamp + "."))
+	mac.Write(body)
+	h := http.Header{}
+	h.Set("X-Timestamp", stamp)
+	h.Set("X-Signature", hex.EncodeToString(mac.Sum(nil)))
+	return h
+}
+
+func TestSensorSignature(t *testing.T) {
+	secret := []byte("s3cret")
+	body := fixture(t, "sensor.json")
+	verify := verifySensor(secret)
+	if err := verify(signed(secret, body, testNow), body, testNow); err != nil {
+		t.Fatalf("valid signature refused: %v", err)
+	}
+	tampered := append([]byte{}, body...)
+	tampered[10] ^= 1
+	cases := map[string]error{
+		"tampered body": verify(signed(secret, body, testNow), tampered, testNow),
+		"wrong key":     verify(signed([]byte("other"), body, testNow), body, testNow),
+		"no signature":  verify(http.Header{}, body, testNow),
+		"replayed":      verify(signed(secret, body, testNow.Add(-time.Hour)), body, testNow),
+	}
+	for name, err := range cases {
+		if err == nil {
+			t.Errorf("%s was accepted", name)
+		}
+	}
+}
+
+func TestParseSensorDrawsArcsToTheSensor(t *testing.T) {
+	evs := must(parseSensor(fixture(t, "sensor.json"), testGeo(t), testNow))
+	if len(evs) != 2 {
+		t.Fatalf("got %d events, want 2 (bad address dropped)", len(evs))
+	}
+	ssh := evs[0]
+	if ssh.DataClass != "telemetry" || ssh.Category != "ssh_bruteforce" || ssh.Severity != 3 {
+		t.Errorf("ssh group: %+v", ssh)
+	}
+	if ssh.DstSensor == nil || *ssh.DstSensor != "sensor-eus1" || ssh.DstLat == nil || *ssh.DstLat != sensorLat {
+		t.Error("telemetry must end at the sensor's configured position")
+	}
+	if evs[1].Category != "telnet_login" || evs[1].Severity != 1 {
+		t.Errorf("telnet group: %+v", evs[1])
+	}
+	if _, ok := ssh.Attrs["password"]; ok {
+		t.Error("passwords must never be published")
+	}
+}
+
+func TestSensorNeedsURLAndSecret(t *testing.T) {
+	t.Setenv("SENSOR_URL", "http://203.0.113.1:8443/events")
+	t.Setenv("SENSOR_HMAC_SECRET", "")
+	if _, ok := sensorSource(); ok {
+		t.Fatal("sensor enabled without a secret")
 	}
 }

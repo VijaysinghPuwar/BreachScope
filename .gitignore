@@ -23,3 +23,11 @@ web/.vite/
 # downloaded at build time
 /geo/*.mmdb
 /pkg/geoip/embedded/
+
+# terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log

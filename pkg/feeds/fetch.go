@@ -51,6 +51,11 @@ func (h *Hub) fetch(ctx context.Context, s Source, lastModified, etag string, no
 	if err != nil {
 		return nil, "", "", false, fmt.Errorf("read %s: %w", s.Name, err)
 	}
+	if s.Verify != nil {
+		if err := s.Verify(resp.Header, body, now); err != nil {
+			return nil, "", "", false, fmt.Errorf("verify %s: %w", s.Name, err)
+		}
+	}
 	evs, err = s.Parse(body, h.geo, now)
 	if err != nil {
 		return nil, "", "", false, fmt.Errorf("parse %s: %w", s.Name, err)

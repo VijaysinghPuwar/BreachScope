@@ -39,7 +39,10 @@ type Source struct {
 	URL       string // human-facing home page
 	FeedURL   string // what we fetch
 	// Header holds extra request headers, such as an API token.
-	Header      map[string]string
+	Header map[string]string
+	// Verify, when set, checks a response before it is parsed (for example
+	// the HMAC signature on our own sensor's export).
+	Verify      func(header http.Header, body []byte, now time.Time) error
 	MinInterval time.Duration
 	// Parse turns the response body into events. now is the fetch time.
 	Parse func(body []byte, geo *geoip.DB, now time.Time) ([]store.Event, error)

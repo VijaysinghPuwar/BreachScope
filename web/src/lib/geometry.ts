@@ -126,7 +126,8 @@ export function mapFeatures(events: Observation[]): FeatureCollection {
         geometry: splitAntimeridian(circle.coordinates[0] as Position[]),
       });
     }
-    if (!event.raw && event.data_class === 'TEL' && event.dst === sensor.name) {
+    // Telemetry from our own sensor: both ends are known, so draw the arc.
+    if (event.data_class === 'TEL' && event.dst === sensor.name) {
       features.push({
         type: 'Feature',
         properties: { ...properties, kind: 'arc' },

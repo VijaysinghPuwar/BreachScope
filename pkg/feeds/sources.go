@@ -67,6 +67,9 @@ func Enabled() []Source {
 	if radar, ok := radarSource(); ok {
 		sources = append(sources, radar)
 	}
+	if sensor, ok := sensorSource(); ok {
+		sources = append(sources, sensor)
+	}
 	return sources
 }
 

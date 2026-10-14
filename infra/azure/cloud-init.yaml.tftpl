@@ -1,0 +1,158 @@
+#cloud-config
+# Rendered by Terraform templatefile(); a doubled dollar sign below renders as a single one.
+package_update: true
+package_upgrade: true
+packages:
+  - git
+  - python3-venv
+  - python3-dev
+  - libssl-dev
+  - libffi-dev
+  - build-essential
+
+users:
+  - default
+  - name: cowrie
+    system: true
+    shell: /usr/sbin/nologin
+    homedir: /home/cowrie
+
+write_files:
+  # Real SSH moves to 22222 (reachable only from the admin IP); 22 and 23 go to Cowrie.
+  - path: /etc/ssh/sshd_config.d/10-breachscope.conf
+    content: |
+      Port 22222
+      PasswordAuthentication no
+      PermitRootLogin no
+
+  - path: /etc/systemd/system/ssh.socket.d/10-port.conf
+    content: |
+      [Socket]
+      ListenStream=
+      ListenStream=0.0.0.0:22222
+      ListenStream=[::]:22222
+
+  - path: /opt/breachscope/cowrie.cfg
+    content: |
+      [honeypot]
+      hostname = srv-backup-04
+      log_path = var/log/cowrie
+      download_path = var/lib/cowrie/downloads
+
+      [shell]
+      # Attackers' wget and curl get nothing: the cowrie user cannot open
+      # outbound connections (see honeypot-iptables.service).
+
+      [ssh]
+      enabled = true
+      listen_endpoints = tcp:2222:interface=0.0.0.0
+
+      [telnet]
+      enabled = true
+      listen_endpoints = tcp:2223:interface=0.0.0.0
+
+      [output_jsonlog]
+      enabled = true
+      logfile = $${honeypot:log_path}/cowrie.json
+      epoch_timestamp = false
+
+  - path: /opt/breachscope/exporter.py
+    permissions: "0755"
+    content: |
+      ${indent(6, exporter)}
+
+  - path: /etc/breachscope/exporter.env
+    permissions: "0600"
+    content: |
+      EXPORTER_HMAC_SECRET=${hmac_secret}
+
+  - path: /usr/local/sbin/honeypot-iptables
+    permissions: "0755"
+    content: |
+      #!/bin/sh
+      # Send the standard ports to Cowrie and stop the cowrie user from
+      # opening any outbound connection (replies to attackers still flow).
+      set -e
+      iptables -t nat -C PREROUTING -p tcp --dport 22 -j REDIRECT --to-port 2222 2>/dev/null ||
+        iptables -t nat -A PREROUTING -p tcp --dport 22 -j REDIRECT --to-port 2222
+      iptables -t nat -C PREROUTING -p tcp --dport 23 -j REDIRECT --to-port 2223 2>/dev/null ||
+        iptables -t nat -A PREROUTING -p tcp --dport 23 -j REDIRECT --to-port 2223
+      UID_COWRIE=$(id -u cowrie)
+      iptables -C OUTPUT -m owner --uid-owner "$UID_COWRIE" -o lo -j ACCEPT 2>/dev/null ||
+        iptables -A OUTPUT -m owner --uid-owner "$UID_COWRIE" -o lo -j ACCEPT
+      iptables -C OUTPUT -m owner --uid-owner "$UID_COWRIE" -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null ||
+        iptables -A OUTPUT -m owner --uid-owner "$UID_COWRIE" -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+      iptables -C OUTPUT -m owner --uid-owner "$UID_COWRIE" -j REJECT 2>/dev/null ||
+        iptables -A OUTPUT -m owner --uid-owner "$UID_COWRIE" -j REJECT
+
+  - path: /etc/systemd/system/honeypot-iptables.service
+    content: |
+      [Unit]
+      Description=Honeypot port redirects and outbound block
+      After=network-online.target
+      Wants=network-online.target
+      Before=cowrie.service
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/sbin/honeypot-iptables
+      RemainAfterExit=true
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /etc/systemd/system/cowrie.service
+    content: |
+      [Unit]
+      Description=Cowrie SSH and Telnet honeypot
+      After=network-online.target honeypot-iptables.service
+      Requires=honeypot-iptables.service
+
+      [Service]
+      User=cowrie
+      Group=cowrie
+      WorkingDirectory=/home/cowrie/cowrie
+      Environment=PYTHONPATH=/home/cowrie/cowrie/src
+      ExecStart=/home/cowrie/cowrie/cowrie-env/bin/twistd --umask=0022 --nodaemon --pidfile= -l - cowrie
+      Restart=always
+      RestartSec=5
+      NoNewPrivileges=true
+      ProtectSystem=strict
+      ReadWritePaths=/home/cowrie/cowrie/var
+      PrivateTmp=true
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /etc/systemd/system/sensor-exporter.service
+    content: |
+      [Unit]
+      Description=Signed read-only export of recent Cowrie activity
+      After=cowrie.service
+
+      [Service]
+      User=cowrie
+      Group=cowrie
+      EnvironmentFile=/etc/breachscope/exporter.env
+      ExecStart=/usr/bin/python3 -I /opt/breachscope/exporter.py
+      Restart=always
+      RestartSec=5
+      NoNewPrivileges=true
+      ProtectSystem=strict
+      ProtectHome=read-only
+      PrivateTmp=true
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  - chown cowrie:cowrie /etc/breachscope/exporter.env
+  - sudo -u cowrie git clone --depth 1 --branch v3.0.15 https://github.com/cowrie/cowrie.git /home/cowrie/cowrie
+  - sudo -u cowrie python3 -m venv /home/cowrie/cowrie/cowrie-env
+  - sudo -u cowrie /home/cowrie/cowrie/cowrie-env/bin/pip install --upgrade pip
+  - sudo -u cowrie /home/cowrie/cowrie/cowrie-env/bin/pip install -e /home/cowrie/cowrie
+  - install -o cowrie -g cowrie -m 0644 /opt/breachscope/cowrie.cfg /home/cowrie/cowrie/etc/cowrie.cfg
+  - sudo -u cowrie mkdir -p /home/cowrie/cowrie/var/log/cowrie /home/cowrie/cowrie/var/lib/cowrie/downloads
+  - systemctl daemon-reload
+  - systemctl restart ssh.socket ssh
+  - systemctl enable --now honeypot-iptables.service cowrie.service sensor-exporter.service

@@ -242,6 +242,20 @@ export function mapStyle(projection: Projection): StyleSpecification {
           'circle-stroke-color': token('--text-primary'),
         },
       },
+      {
+        // The sensor sits at its region's published centre, and says so.
+        id: 'sensor-label',
+        type: 'symbol',
+        source: 'sensor',
+        layout: {
+          'text-field': 'sensor-eus1\nconfigured · Azure East US',
+          'text-font': ['Inter'],
+          'text-size': 11,
+          'text-anchor': 'top',
+          'text-offset': [0, 0.9],
+        },
+        paint: labelPaint,
+      },
     ],
   };
 }
