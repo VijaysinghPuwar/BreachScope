@@ -97,8 +97,11 @@ export default function MapCanvas(props: Props) {
       );
       instance.getCanvas().setAttribute('aria-label', current.current.summary);
       instance.getCanvas().setAttribute('role', 'img');
-      instance.on('error', () => {
-        if (!disposed) setFailed(true);
+      // MapLibre reports every failed tile or glyph download as an 'error'.
+      // Those are transient and the map keeps working, so only log them; a
+      // lost WebGL context (below) or a failed start (catch) is fatal.
+      instance.on('error', (event) => {
+        console.warn('Map resource error', event.error?.message ?? event);
       });
       instance.on('webglcontextlost', () => {
         if (!disposed) setFailed(true);

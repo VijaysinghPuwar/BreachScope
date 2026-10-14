@@ -135,3 +135,15 @@ test('search, class filters, missing accuracy, KEV details and new UID accent', 
     'https://nvd.nist.gov/vuln/detail/CVE-2026-10000',
   );
 });
+
+test('a failed tile download does not take the map down', async ({ page }) => {
+  await page.route('**/api/live', (route) => route.fulfill({ json: fixture }));
+  // Every street-detail tile fails, as on a flaky connection.
+  await page.route('https://tiles.openfreemap.org/planet/**', (route) => route.abort('failed'));
+  await page.goto('/');
+  await expect(page.getByTestId('map-canvas')).toHaveAttribute('data-ready', 'true', {
+    timeout: 30_000,
+  });
+  await page.waitForTimeout(2_000);
+  await expect(page.getByText("This device can't draw the map.", { exact: false })).toHaveCount(0);
+});
