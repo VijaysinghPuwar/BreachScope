@@ -1,0 +1,5 @@
+{
+  "1965861": [{"ioc_value": "8.8.8.8:80", "ioc_type": "ip:port", "threat_type": "botnet_cc", "malware_printable": "VShell", "first_seen_utc": "2026-10-14 19:05:07", "confidence_level": 100, "tags": "vshell"}],
+  "1965862": [{"ioc_value": "http://bad.example.com/a.sh", "ioc_type": "url", "threat_type": "payload_delivery", "malware_printable": "Mirai", "first_seen_utc": "2026-10-14 18:00:00", "confidence_level": 75, "tags": null}],
+  "1000000": [{"ioc_value": "1.1.1.1:443", "ioc_type": "ip:port", "threat_type": "botnet_cc", "malware_printable": "Old", "first_seen_utc": "2026-09-01 00:00:00", "confidence_level": 50, "tags": null}]
+}

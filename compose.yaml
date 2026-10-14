@@ -1,0 +1,37 @@
+# Local development: Postgres 16 and the API. The web app runs with
+# `npm run dev` in web/, which proxies /api to port 8080.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: breachscope
+      POSTGRES_USER: bs
+      POSTGRES_PASSWORD: bs
+    ports: ["127.0.0.1:55432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bs -d breachscope"]
+      interval: 2s
+      retries: 30
+
+  migrate:
+    build: .
+    entrypoint: ["/usr/local/bin/migrate"]
+    environment:
+      DATABASE_URL: postgres://bs:bs@db:5432/breachscope?sslmode=disable
+    depends_on:
+      db: { condition: service_healthy }
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgres://bs:bs@db:5432/breachscope?sslmode=disable
+      PORT: "8080"
+      GEOIP_DIR: /geo
+    volumes: ["./geo:/geo:ro"]   # fill with scripts/fetch-geo.sh
+    ports: ["127.0.0.1:8080:8080"]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+
+volumes:
+  pgdata:

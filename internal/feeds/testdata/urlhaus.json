@@ -1,0 +1,4 @@
+{
+  "3950205": [{"dateadded": "2026-10-14 18:47:06 UTC", "url": "http://8.8.4.4:36762/i", "url_status": "online", "threat": "malware_download", "reporter": "tester"}],
+  "3950206": [{"dateadded": "2026-10-14 18:40:00 UTC", "url": "https://files.example.net/x.exe", "url_status": "offline", "threat": "malware_download", "reporter": "tester"}]
+}

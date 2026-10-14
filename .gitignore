@@ -1,0 +1,24 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# go
+/bin/
+*.test
+*.out
+coverage.*
+
+# web
+node_modules/
+web/dist/
+web/test-results/
+web/playwright-report/
+web/.vite/
+
+# misc
+.DS_Store
+.vercel
+
+# downloaded at build time
+/geo/*.mmdb

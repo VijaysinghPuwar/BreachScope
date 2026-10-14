@@ -1,0 +1,129 @@
+/* BreachScope token variables for this canvas, compiled from ds/breachscope/tokens.json. Fonts load from Google Fonts in each artboard. */
+:root,
+[data-theme='dark'] {
+  --bg-base: #0e1013;
+  --bg-panel: #14171b;
+  --bg-raised: #1b1f24;
+  --bg-selected: #222831;
+  --bg-hud: #14171beb;
+  --border-subtle: #23282e;
+  --border-default: #2e343b;
+  --border-strong: #5f6a78;
+  --text-primary: #e4e6e9;
+  --text-secondary: #a2a8b0;
+  --text-tertiary: #888f97;
+  --text-disabled: #4c525a;
+  --accent: #8ea4c2;
+  --accent-hover: #a3b6d0;
+  --accent-pressed: #7c93b3;
+  --accent-fg: #0e1013;
+  --map-land: #1a1e23;
+  --map-border: #2b3138;
+  --map-coast: #353c44;
+  --map-graticule: #1c2025;
+  --sev-0: #7d8792;
+  --sev-1: #8ba58a;
+  --sev-2: #c2a56a;
+  --sev-3: #c3825c;
+  --sev-4: #c96b6b;
+  --hex-1: #8ea4c233;
+  --hex-2: #8ea4c259;
+  --hex-3: #8ea4c280;
+  --hex-4: #8ea4c2b2;
+  --hex-5: #8ea4c2e6;
+  --success: var(--sev-1);
+  --danger: var(--sev-4);
+  --warning: var(--sev-2);
+  --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --radius-chip: 4px;
+  --radius-control: 6px;
+  --radius-panel: 8px;
+  --duration-hover: 120ms;
+  --duration-panel: 200ms;
+  --duration-projection: 600ms;
+  --duration-camera: 800ms;
+  --duration-feed-new: 1200ms;
+  --duration-skeleton: 1400ms;
+  --duration-arc: 1600ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --opacity-arc: 0.8;
+  --opacity-skeleton: 0.6;
+  --topbar-h: 48px;
+  --feed-w: 340px;
+  --rail-w: 48px;
+  --panel-w: 400px;
+  --map-min-w: 560px;
+  --timeline-h: 112px;
+  --timeline-replay-h: 160px;
+  --timeline-tablet-h: 96px;
+  --mode-banner-h: 32px;
+  --row-comfortable: 64px;
+  --row-compact: 48px;
+  --table-row: 36px;
+  --control-h: 32px;
+  --touch-target: 44px;
+  --drawer-feed-w: 320px;
+  --drawer-panel-w: 380px;
+  --tabbar-h: 56px;
+  --sheet-peek: 136px;
+  --scrubber-h: 72px;
+  --search-w: 280px;
+  --tooltip-max-w: 280px;
+  --palette-w: 560px;
+  --signin-w: 360px;
+  --prose-max-w: 680px;
+  --hud-w: 220px;
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+.display {
+  font-family: var(--font-sans);
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.title {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.body {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 400;
+}
+.label {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+}
+.caption {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 400;
+}
+.metric {
+  font-family: var(--font-sans);
+  font-size: 20px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 400;
+}
