@@ -7,12 +7,12 @@ One small VM runs [Cowrie](https://github.com/cowrie/cowrie), a fake SSH and Tel
 ```
 attacker ──22/23──▶ VM ──iptables──▶ Cowrie (2222/2223) ──▶ cowrie.json
                                                                  │
-website /api/live ◀──HMAC-signed JSON── exporter.py (8443) ◀─────┘
+website /api/live ◀──signed JSON──── exporter.py (8443) ◀─────┘
 ```
 
 - **Ports.** 22 and 23 are redirected to Cowrie. The real SSH daemon listens on 22222 and the NSG only lets `admin_cidr` reach it.
 - **Containment.** The NSG allows outbound web and DNS only. On the host, an iptables owner rule stops the `cowrie` user from opening any outbound connection, so commands an attacker types (`wget`, `curl`) cannot fetch anything. Replies to the attacker still flow.
-- **Export.** `exporter.py` groups the last 48 hours by attacker IP, protocol and hour and serves it on `GET /events`. Each response is signed: `X-Signature = HMAC-SHA256(secret, X-Timestamp + "." + body)`. The website refuses unsigned, altered or stale (over 10 minutes) responses. Passwords attackers try are never exported, only usernames. Cached for 30 s and limited to 30 requests a minute per address.
+- **Export.** `exporter.py` groups the last 48 hours by attacker IP, protocol and hour and serves it on `GET /events`. Each response is signed with Ed25519 over `X-Timestamp + "." + body`. The private key exists only on the VM and in the local Terraform state; the website verifies with the public key in `pkg/feeds/sensor_pubkey.pem`, so no secret is stored in Vercel. Unsigned, altered or stale (over 10 minutes) responses are refused. Passwords attackers try are never exported, only usernames. Cached for 30 s and limited to 30 requests a minute per address.
 - **Position.** The sensor is drawn at the published centre of the Azure East US region and labelled `configured`, never at a geolocated address.
 
 ## Cost
@@ -26,10 +26,11 @@ az login
 cd infra/azure
 cp terraform.tfvars.example terraform.tfvars   # fill in; never commit it
 terraform init && terraform apply
-terraform output sensor_url                    # set SENSOR_URL in Vercel
+terraform output -raw sensor_public_key > ../../pkg/feeds/sensor_pubkey.pem
+terraform output -raw sensor_url               # put in sensorDefaultURL, pkg/feeds/sensor.go
 ```
 
-Then set `SENSOR_URL` and `SENSOR_HMAC_SECRET` (the same secret as in `terraform.tfvars`) in the Vercel project and redeploy.
+Commit those two values and push; nothing secret goes into Vercel.
 
 ## Operate
 

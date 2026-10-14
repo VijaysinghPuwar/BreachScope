@@ -3,16 +3,16 @@
 
 Read-only. Groups Cowrie's JSON log by attacker IP, protocol and hour, and
 serves it on GET /events. Every response carries X-Timestamp and
-X-Signature = hex(HMAC-SHA256(secret, timestamp + "." + body)), so the
-website can reject anything forged, altered or older than a few minutes.
+X-Signature = hex(Ed25519 signature of timestamp + "." + body). The private
+key never leaves this host; the website checks the signature with the public
+key, so it can reject anything forged, altered or older than a few minutes
+without holding any secret.
 
 Passwords that attackers try are never published, only usernames.
-Standard library only, so the honeypot host needs nothing extra installed.
+Runs on Cowrie's own Python environment, which already has `cryptography`.
 """
 
 import glob
-import hashlib
-import hmac
 import json
 import os
 import threading
@@ -22,7 +22,10 @@ from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 LOG_GLOB = os.environ.get("COWRIE_LOG_GLOB", "/home/cowrie/cowrie/var/log/cowrie/cowrie.json*")
-SECRET = os.environ["EXPORTER_HMAC_SECRET"].encode()
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
+
+with open(os.environ.get("SENSOR_KEY_FILE", "/etc/breachscope/sensor.key"), "rb") as key_file:
+    KEY = load_pem_private_key(key_file.read(), password=None)
 WINDOW = timedelta(hours=48)
 CACHE_SECONDS = 30
 RATE_PER_MINUTE = 30
@@ -139,7 +142,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         body = body_now()
         stamp = str(int(time.time()))
-        signature = hmac.new(SECRET, stamp.encode() + b"." + body, hashlib.sha256).hexdigest()
+        signature = KEY.sign(stamp.encode() + b"." + body).hex()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))

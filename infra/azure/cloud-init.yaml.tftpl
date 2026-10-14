@@ -61,10 +61,10 @@ write_files:
     content: |
       ${indent(6, exporter)}
 
-  - path: /etc/breachscope/exporter.env
+  - path: /etc/breachscope/sensor.key
     permissions: "0600"
     content: |
-      EXPORTER_HMAC_SECRET=${hmac_secret}
+      ${indent(6, signing_key)}
 
   - path: /usr/local/sbin/honeypot-iptables
     permissions: "0755"
@@ -133,8 +133,7 @@ write_files:
       [Service]
       User=cowrie
       Group=cowrie
-      EnvironmentFile=/etc/breachscope/exporter.env
-      ExecStart=/usr/bin/python3 -I /opt/breachscope/exporter.py
+      ExecStart=/home/cowrie/cowrie/cowrie-env/bin/python -I /opt/breachscope/exporter.py
       Restart=always
       RestartSec=5
       NoNewPrivileges=true
@@ -146,7 +145,7 @@ write_files:
       WantedBy=multi-user.target
 
 runcmd:
-  - chown cowrie:cowrie /etc/breachscope/exporter.env
+  - chown cowrie:cowrie /etc/breachscope/sensor.key
   - sudo -u cowrie git clone --depth 1 --branch v3.0.15 https://github.com/cowrie/cowrie.git /home/cowrie/cowrie
   - sudo -u cowrie python3 -m venv /home/cowrie/cowrie/cowrie-env
   - sudo -u cowrie /home/cowrie/cowrie/cowrie-env/bin/pip install --upgrade pip

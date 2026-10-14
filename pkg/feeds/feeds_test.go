@@ -2,9 +2,10 @@ package feeds
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
+	"crypto/ed25519"
+	"crypto/x509"
 	"encoding/hex"
+	"encoding/pem"
 	"io"
 	"log/slog"
 	"net/http"
@@ -268,31 +269,29 @@ func TestRadarNeedsAToken(t *testing.T) {
 	}
 }
 
-func signed(secret, body []byte, at time.Time) http.Header {
+func signed(key ed25519.PrivateKey, body []byte, at time.Time) http.Header {
 	stamp := strconv.FormatInt(at.Unix(), 10)
-	mac := hmac.New(sha256.New, secret)
-	mac.Write([]byte(stamp + "."))
-	mac.Write(body)
 	h := http.Header{}
 	h.Set("X-Timestamp", stamp)
-	h.Set("X-Signature", hex.EncodeToString(mac.Sum(nil)))
+	h.Set("X-Signature", hex.EncodeToString(ed25519.Sign(key, append([]byte(stamp+"."), body...))))
 	return h
 }
 
 func TestSensorSignature(t *testing.T) {
-	secret := []byte("s3cret")
+	pub, priv, _ := ed25519.GenerateKey(nil)
+	_, other, _ := ed25519.GenerateKey(nil)
 	body := fixture(t, "sensor.json")
-	verify := verifySensor(secret)
-	if err := verify(signed(secret, body, testNow), body, testNow); err != nil {
+	verify := verifySensor(pub)
+	if err := verify(signed(priv, body, testNow), body, testNow); err != nil {
 		t.Fatalf("valid signature refused: %v", err)
 	}
 	tampered := append([]byte{}, body...)
 	tampered[10] ^= 1
 	cases := map[string]error{
-		"tampered body": verify(signed(secret, body, testNow), tampered, testNow),
-		"wrong key":     verify(signed([]byte("other"), body, testNow), body, testNow),
+		"tampered body": verify(signed(priv, body, testNow), tampered, testNow),
+		"wrong key":     verify(signed(other, body, testNow), body, testNow),
 		"no signature":  verify(http.Header{}, body, testNow),
-		"replayed":      verify(signed(secret, body, testNow.Add(-time.Hour)), body, testNow),
+		"replayed":      verify(signed(priv, body, testNow.Add(-time.Hour)), body, testNow),
 	}
 	for name, err := range cases {
 		if err == nil {
@@ -321,10 +320,14 @@ func TestParseSensorDrawsArcsToTheSensor(t *testing.T) {
 	}
 }
 
-func TestSensorNeedsURLAndSecret(t *testing.T) {
-	t.Setenv("SENSOR_URL", "http://203.0.113.1:8443/events")
-	t.Setenv("SENSOR_HMAC_SECRET", "")
-	if _, ok := sensorSource(); ok {
-		t.Fatal("sensor enabled without a secret")
+func TestSensorKeyParsing(t *testing.T) {
+	pub, _, _ := ed25519.GenerateKey(nil)
+	der, _ := x509.MarshalPKIXPublicKey(pub)
+	good := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: der})
+	if key, err := parseSensorKey(good); err != nil || !key.Equal(pub) {
+		t.Fatalf("parse: %v", err)
+	}
+	if _, err := parseSensorKey([]byte("not a key")); err == nil {
+		t.Fatal("garbage parsed as a key")
 	}
 }

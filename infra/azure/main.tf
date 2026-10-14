@@ -1,11 +1,18 @@
 # A single small VM running the Cowrie SSH and Telnet honeypot. Attackers
 # reach Cowrie on ports 22 and 23; the real SSH daemon listens on 22222 and is
 # reachable only from admin_cidr. A tiny read-only exporter on 8443 serves the
-# last 48 hours of Cowrie sessions, signed with HMAC, for the website to pull.
+# last 48 hours of Cowrie sessions, signed with Ed25519, for the website to pull.
 
 locals {
   name = "breachscope-sensor"
   tags = { project = "breachscope", role = "honeypot" }
+}
+
+# Signs the sensor's exports. The private half goes only to the VM (and this
+# Terraform state, which stays local); the public half is committed to the
+# website's code so it can verify without holding a secret.
+resource "tls_private_key" "sensor" {
+  algorithm = "ED25519"
 }
 
 resource "azurerm_resource_group" "sensor" {
@@ -59,7 +66,7 @@ resource "azurerm_network_security_group" "sensor" {
     destination_address_prefix = "*"
   }
 
-  # Read-only, HMAC-signed, rate limited. Vercel has no fixed egress IPs on
+  # Read-only, signed, rate limited. Vercel has no fixed egress IPs on
   # the Hobby plan, so this cannot be narrowed to a source range.
   security_rule {
     name                       = "exporter"
@@ -169,7 +176,7 @@ resource "azurerm_linux_virtual_machine" "sensor" {
   }
 
   custom_data = base64encode(templatefile("${path.module}/cloud-init.yaml.tftpl", {
-    hmac_secret = var.exporter_hmac_secret
+    signing_key = tls_private_key.sensor.private_key_pem
     exporter    = file("${path.module}/exporter.py")
   }))
 }

@@ -20,12 +20,6 @@ variable "ssh_public_key_path" {
   default     = "~/.ssh/id_ed25519.pub"
 }
 
-variable "exporter_hmac_secret" {
-  description = "Shared secret the exporter signs responses with. Same value as SENSOR_HMAC_SECRET in Vercel."
-  type        = string
-  sensitive   = true
-}
-
 variable "budget_email" {
   description = "Where budget alerts go."
   type        = string

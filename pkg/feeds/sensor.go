@@ -1,10 +1,12 @@
 package feeds
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
+	"crypto/ed25519"
+	"crypto/x509"
+	_ "embed"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"net/http"
@@ -32,35 +34,63 @@ const (
 	sensorMaxAge = 10 * time.Minute
 )
 
-// sensorSource is enabled when SENSOR_URL and SENSOR_HMAC_SECRET are set.
+// The sensor's public key and address. Both are public: the key only
+// verifies, and the address only serves signed, read-only data. They are
+// filled in from `terraform output` after the sensor is deployed; until then
+// the source stays off. SENSOR_URL overrides the address for testing.
+//
+//go:embed sensor_pubkey.pem
+var sensorPublicKeyPEM []byte
+
+const sensorDefaultURL = ""
+
 func sensorSource() (Source, bool) {
 	url := strings.TrimSpace(os.Getenv("SENSOR_URL"))
-	secret := strings.TrimSpace(os.Getenv("SENSOR_HMAC_SECRET"))
-	if url == "" || secret == "" {
+	if url == "" {
+		url = sensorDefaultURL
+	}
+	key, err := parseSensorKey(sensorPublicKeyPEM)
+	if url == "" || err != nil {
 		return Source{}, false
 	}
 	return Source{
 		Name: "Cowrie (sensor-eus1)", DataClass: "telemetry", Licence: "Own data",
 		URL: "https://github.com/cowrie/cowrie", FeedURL: url,
 		MinInterval: 2 * time.Minute,
-		Verify:      verifySensor([]byte(secret)),
+		Verify:      verifySensor(key),
 		Parse:       parseSensor,
 	}, true
 }
 
+func parseSensorKey(pemBytes []byte) (ed25519.PublicKey, error) {
+	block, _ := pem.Decode(pemBytes)
+	if block == nil {
+		return nil, errors.New("no sensor public key")
+	}
+	parsed, err := x509.ParsePKIXPublicKey(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	key, ok := parsed.(ed25519.PublicKey)
+	if !ok {
+		return nil, errors.New("sensor key is not Ed25519")
+	}
+	return key, nil
+}
+
 var errBadSignature = errors.New("bad or missing signature")
 
-func verifySensor(secret []byte) func(http.Header, []byte, time.Time) error {
+// verifySensor checks X-Signature, an Ed25519 signature over
+// X-Timestamp + "." + body, and refuses responses older than sensorMaxAge.
+func verifySensor(key ed25519.PublicKey) func(http.Header, []byte, time.Time) error {
 	return func(h http.Header, body []byte, now time.Time) error {
 		stamp := h.Get("X-Timestamp")
 		sig, err := hex.DecodeString(h.Get("X-Signature"))
-		if stamp == "" || err != nil {
+		if stamp == "" || err != nil || len(sig) != ed25519.SignatureSize {
 			return errBadSignature
 		}
-		mac := hmac.New(sha256.New, secret)
-		mac.Write([]byte(stamp + "."))
-		mac.Write(body)
-		if !hmac.Equal(mac.Sum(nil), sig) {
+		msg := append([]byte(stamp+"."), body...)
+		if !ed25519.Verify(key, msg, sig) {
 			return errBadSignature
 		}
 		secs, err := strconv.ParseInt(stamp, 10, 64)
