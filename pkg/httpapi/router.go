@@ -16,9 +16,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
-	"github.com/VijaysinghPuwar/BreachScope/internal/feeds"
-	"github.com/VijaysinghPuwar/BreachScope/internal/store"
-	"github.com/VijaysinghPuwar/BreachScope/internal/stream"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/feeds"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/store"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/stream"
 )
 
 // Events is what the handlers need from the store.

@@ -9,13 +9,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/VijaysinghPuwar/BreachScope/internal/config"
-	"github.com/VijaysinghPuwar/BreachScope/internal/db"
-	"github.com/VijaysinghPuwar/BreachScope/internal/feeds"
-	"github.com/VijaysinghPuwar/BreachScope/internal/geoip"
-	"github.com/VijaysinghPuwar/BreachScope/internal/httpapi"
-	"github.com/VijaysinghPuwar/BreachScope/internal/store"
-	"github.com/VijaysinghPuwar/BreachScope/internal/stream"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/config"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/db"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/feeds"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/geoip"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/httpapi"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/store"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/stream"
 )
 
 // Build returns the handler and a close function. Opening the pool does not

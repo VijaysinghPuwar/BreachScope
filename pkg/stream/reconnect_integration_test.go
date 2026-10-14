@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/VijaysinghPuwar/BreachScope/internal/store"
-	"github.com/VijaysinghPuwar/BreachScope/internal/stream"
-	"github.com/VijaysinghPuwar/BreachScope/internal/testpg"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/store"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/stream"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/testpg"
 )
 
 // TestForcedReconnectLosesNothing writes events from several concurrent

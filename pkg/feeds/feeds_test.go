@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/VijaysinghPuwar/BreachScope/internal/geoip"
-	"github.com/VijaysinghPuwar/BreachScope/internal/store"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/geoip"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/store"
 )
 
 var testNow = time.Date(2026, 10, 14, 19, 30, 0, 0, time.UTC)

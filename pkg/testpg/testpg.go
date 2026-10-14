@@ -11,7 +11,7 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 
-	"github.com/VijaysinghPuwar/BreachScope/internal/db"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/db"
 )
 
 // Start runs Postgres 16 in a container, applies the migrations twice (the

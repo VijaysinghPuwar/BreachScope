@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/VijaysinghPuwar/BreachScope/internal/store"
-	"github.com/VijaysinghPuwar/BreachScope/internal/testpg"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/store"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/testpg"
 )
 
 func ptr[T any](v T) *T { return &v }

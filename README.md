@@ -28,11 +28,14 @@ api/            Vercel Go function (one handler, all /api routes)
 cmd/apiserver/  the same router as a standalone server (Docker, local)
 cmd/migrate/    applies schema migrations
 cmd/ssecheck/   holds an SSE connection against a deployment and reports drops
-internal/
+pkg/
+  feeds/        public feed fetchers, politeness rules, /api/live snapshot
+  geoip/        DB-IP lookups (city, country, ASN)
   db/           pool setup and embedded migrations
   store/        SQL for reading and writing events
   stream/       SSE handler with cursor resume
   httpapi/      routes, validation, error shape
+scripts/        build-time download of the DB-IP databases
 web/            React app
 ```
 
@@ -72,7 +75,7 @@ npm run typecheck && npm run lint && npm test
 npm run test:e2e                    # Playwright and axe at 1440, 1024, 820 and 390 px
 ```
 
-`internal/stream/reconnect_integration_test.go` runs four concurrent writers against a real Postgres while a client drops and resumes its connection at random points, then checks that the set of event ids it received equals the set in the database: nothing missing, nothing twice.
+`pkg/stream/reconnect_integration_test.go` runs four concurrent writers against a real Postgres while a client drops and resumes its connection at random points, then checks that the set of event ids it received equals the set in the database: nothing missing, nothing twice.
 
 ## Data sources and licences
 

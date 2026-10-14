@@ -9,8 +9,8 @@ import (
 	"os"
 	"sync"
 
-	"github.com/VijaysinghPuwar/BreachScope/internal/app"
-	"github.com/VijaysinghPuwar/BreachScope/internal/config"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/app"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/config"
 )
 
 var (

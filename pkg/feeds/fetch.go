@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/VijaysinghPuwar/BreachScope/internal/store"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/store"
 )
 
 // maxBody guards memory: the largest feed (URLhaus recent) is about 20 MB.

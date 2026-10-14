@@ -16,7 +16,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/VijaysinghPuwar/BreachScope/internal/store"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/store"
 )
 
 // Source is the part of the store the stream needs. Tests pass a fake.

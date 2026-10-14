@@ -12,8 +12,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/VijaysinghPuwar/BreachScope/internal/app"
-	"github.com/VijaysinghPuwar/BreachScope/internal/config"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/app"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/config"
 )
 
 func main() {

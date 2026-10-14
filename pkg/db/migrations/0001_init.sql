@@ -1,4 +1,4 @@
--- Core schema. See internal/db/NOTES.md for why each table and index exists.
+-- Core schema. See pkg/db/NOTES.md for why each table and index exists.
 
 CREATE TABLE source (
   id               smallserial PRIMARY KEY,

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/VijaysinghPuwar/BreachScope/internal/geoip"
-	"github.com/VijaysinghPuwar/BreachScope/internal/store"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/geoip"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/store"
 )
 
 // recentWindow limits the large feeds to what is actually recent. URLhaus and

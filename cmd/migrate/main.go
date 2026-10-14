@@ -11,7 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/VijaysinghPuwar/BreachScope/internal/db"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/db"
 )
 
 func main() {

@@ -18,8 +18,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/VijaysinghPuwar/BreachScope/internal/geoip"
-	"github.com/VijaysinghPuwar/BreachScope/internal/store"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/geoip"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/store"
 )
 
 // UserAgent identifies us to feed operators. DShield asks for contact details.

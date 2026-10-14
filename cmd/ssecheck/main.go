@@ -17,7 +17,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/VijaysinghPuwar/BreachScope/internal/stream"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/stream"
 )
 
 func main() {

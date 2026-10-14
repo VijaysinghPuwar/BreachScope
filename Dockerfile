@@ -5,7 +5,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY api ./api
 COPY cmd ./cmd
-COPY internal ./internal
+COPY pkg ./pkg
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/apiserver ./cmd/apiserver \
  && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/migrate ./cmd/migrate
 

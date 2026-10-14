@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/VijaysinghPuwar/BreachScope/internal/store"
+	"github.com/VijaysinghPuwar/BreachScope/pkg/store"
 )
 
 // fakeSource is an in-memory, append-only event log.
