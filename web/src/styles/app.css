@@ -484,6 +484,9 @@ select {
   z-index: 20;
 }
 .wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-size: 16px;
   font-weight: 600;
   line-height: 24px;
@@ -2042,6 +2045,10 @@ select {
   gap: 16px;
 }
 .intro-wordmark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
   font: 600 24px/32px var(--font-sans);
   color: var(--text-primary);
   letter-spacing: -0.01em;

@@ -6,6 +6,7 @@ import { classNames, dataClasses, type DataClass } from '../data/events';
 import { ClassFilters } from './MapControls';
 import { Button, Chip, PopoverPanel, SegmentedControl, Tooltip } from './ui';
 import { navigation } from '../data/navigation';
+import { Logo } from './Logo';
 export function NavigationMenu() {
   return (
     <Dropdown.Root>
@@ -63,6 +64,7 @@ export function TopBar({
   return (
     <header className="topbar">
       <a href="/" className="wordmark">
+        <Logo size={22} />
         BreachScope
       </a>
       {!mobile && (

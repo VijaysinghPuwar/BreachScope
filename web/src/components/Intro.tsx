@@ -1,3 +1,4 @@
+import { Logo } from './Logo';
 import { useEffect, useState } from 'react';
 
 /** The intro stays at least this long so it reads as a step, not a flicker. */
@@ -42,7 +43,10 @@ export function Intro({
   return (
     <div className="intro" data-leaving={done} role="status" aria-live="polite">
       <div className="intro-card">
-        <div className="intro-wordmark">BreachScope</div>
+        <div className="intro-wordmark">
+          <Logo size={32} />
+          BreachScope
+        </div>
         <div className="intro-track" aria-hidden="true">
           <div className="intro-bar" style={{ transform: `scaleX(${progress})` }} />
         </div>
