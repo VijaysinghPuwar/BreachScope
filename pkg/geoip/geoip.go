@@ -52,6 +52,24 @@ func Open(dir string) (*DB, error) {
 	return db, nil
 }
 
+// OpenEmbedded returns the databases compiled into the binary, if this build
+// has them (-tags geoembed). ok is false otherwise.
+func OpenEmbedded() (db *DB, ok bool, err error) {
+	city, asn, ok := embedded()
+	if !ok {
+		return nil, false, nil
+	}
+	c, err := maxminddb.OpenBytes(city)
+	if err != nil {
+		return nil, true, fmt.Errorf("embedded city database: %w", err)
+	}
+	db = &DB{city: c}
+	if a, err := maxminddb.OpenBytes(asn); err == nil {
+		db.asn = a
+	}
+	return db, true, nil
+}
+
 type cityRecord struct {
 	City struct {
 		Names map[string]string `maxminddb:"names"`

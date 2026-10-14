@@ -22,3 +22,4 @@ web/.vite/
 
 # downloaded at build time
 /geo/*.mmdb
+/pkg/geoip/embedded/

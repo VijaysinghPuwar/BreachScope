@@ -52,10 +52,12 @@ func Build(ctx context.Context, cfg config.Config, log *slog.Logger) (http.Handl
 	return httpapi.NewRouter(deps), closeFn, nil
 }
 
-// openGeo looks for the DB-IP files in the configured directory, then next to
-// the working directory and the executable. Vercel bundles them via
-// includeFiles, and the function's working directory is not documented.
+// openGeo uses the databases compiled into the binary when the build has them
+// (production on Vercel), otherwise it looks for the files on disk.
 func openGeo(dir string) (*geoip.DB, error) {
+	if db, ok, err := geoip.OpenEmbedded(); ok {
+		return db, err
+	}
 	candidates := []string{dir, "geo", "../geo"}
 	if exe, err := os.Executable(); err == nil {
 		candidates = append(candidates, filepath.Join(filepath.Dir(exe), "geo"))

@@ -2,12 +2,11 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "npm ci --prefix web",
-  "buildCommand": "sh scripts/fetch-geo.sh && npm run build --prefix web",
+  "buildCommand": "sh scripts/fetch-geo.sh pkg/geoip/embedded && npm run build --prefix web",
   "outputDirectory": "web/dist",
   "functions": {
     "api/index.go": {
-      "maxDuration": 300,
-      "includeFiles": "geo/**"
+      "maxDuration": 300
     }
   },
   "rewrites": [
@@ -38,5 +37,10 @@
         }
       ]
     }
-  ]
+  ],
+  "build": {
+    "env": {
+      "GO_BUILD_FLAGS": "-ldflags '-s -w' -tags geoembed"
+    }
+  }
 }

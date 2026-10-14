@@ -1,8 +1,9 @@
 #!/bin/sh
-# Downloads the DB-IP Lite city and ASN databases (CC BY 4.0) into geo/.
+# Downloads the DB-IP Lite city and ASN databases (CC BY 4.0).
+# Usage: scripts/fetch-geo.sh [dir]   (default: geo/)
 # DB-IP publishes a new file each month; fall back to last month early on.
 set -eu
-dir="$(dirname "$0")/../geo"
+dir="${1:-$(dirname "$0")/../geo}"
 mkdir -p "$dir"
 this=$(date -u +%Y-%m)
 last=$(date -u -d "$(date -u +%Y-%m-15) -1 month" +%Y-%m 2>/dev/null || date -u -v-1m +%Y-%m)
