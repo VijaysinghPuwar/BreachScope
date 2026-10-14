@@ -147,3 +147,39 @@ test('a failed tile download does not take the map down', async ({ page }) => {
   await page.waitForTimeout(2_000);
   await expect(page.getByText("This device can't draw the map.", { exact: false })).toHaveCount(0);
 });
+
+test.describe('leaving Earth for the space view', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.route('**/api/live', (route) => route.fulfill({ json: fixture }));
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    await expect(page.getByTestId('map-canvas')).toHaveAttribute('data-ready', 'true', {
+      timeout: 30_000,
+    });
+    await page.mouse.move(800, 450);
+  });
+
+  test('one fast flick from the default view stays on Earth', async ({ page }) => {
+    await page.mouse.wheel(0, 1200);
+    await page.waitForTimeout(1500);
+    await expect(page).toHaveURL(/\/$/);
+  });
+
+  test('scrolling on at the smallest globe opens space', async ({ page }) => {
+    for (let i = 0; i < 30 && !page.url().endsWith('/space'); i++) {
+      await page.mouse.wheel(0, 120);
+      await page.waitForTimeout(150);
+    }
+    await expect(page).toHaveURL(/\/space$/);
+    await expect(page.getByTestId('space-view')).toBeVisible();
+  });
+
+  test('the orbit button opens space and Back to Earth returns', async ({ page }) => {
+    await page.getByRole('button', { name: 'Zoom out to space' }).click();
+    await expect(page.getByTestId('space-view')).toBeVisible();
+    await page.getByRole('button', { name: 'Back to Earth' }).click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByTestId('space-view')).toHaveCount(0);
+    await expect(page.getByTestId('map-canvas')).toHaveAttribute('data-ready', 'true');
+  });
+});

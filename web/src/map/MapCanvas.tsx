@@ -67,27 +67,31 @@ export default function MapCanvas(props: Props) {
       instance.touchZoomRotate.disableRotation();
       // Keep scrolling out at the widest view and the camera leaves Earth for
       // the space view. A little resistance first, so it never happens by accident.
-      // Trackpads send many small deltas and mouse wheels a few large ones, so
-      // count both. Zoom eases after each step, so the count survives the
-      // easing and only resets after a pause or a zoom back in.
+      // Leaving Earth must be deliberate: the globe has to be sitting at its
+      // smallest size for a moment, and only then does further scrolling
+      // out count. A single fast flick from the default view never jumps.
+      // Trackpads send many small deltas and mouse wheels a few large ones,
+      // so both the distance and the number of steps are counted.
+      let atMinSince = 0;
       let pushOut = 0;
       let steps = 0;
-      let last = 0;
       instance.getCanvasContainer().addEventListener(
         'wheel',
         (event) => {
           const now = performance.now();
-          if (event.deltaY <= 0 || now - last > 1200) {
+          const atMin = instance.getZoom() <= instance.getMinZoom() + 0.05;
+          if (event.deltaY <= 0 || !atMin) {
+            atMinSince = 0;
             pushOut = 0;
             steps = 0;
+            return;
           }
-          last = now;
-          if (event.deltaY <= 0) return;
-          // Zoom settles a little above the minimum, so allow some slack.
-          if (instance.getZoom() > instance.getMinZoom() + 0.3) return;
+          if (!atMinSince) atMinSince = now;
+          if (now - atMinSince < 400) return;
           pushOut += event.deltaY;
           steps += 1;
-          if (pushOut > 300 || steps > 8) {
+          if (pushOut > 300 || steps > 6) {
+            atMinSince = 0;
             pushOut = 0;
             steps = 0;
             current.current.onSpace();
