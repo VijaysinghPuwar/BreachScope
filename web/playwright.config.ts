@@ -20,6 +20,17 @@ export default defineConfig({
     headless: true,
     launchOptions: { args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] },
     trace: 'retain-on-failure',
+    // Most specs test the console itself, so the first-visit guide starts
+    // dismissed. onboarding.spec.ts clears this to test the guide.
+    storageState: {
+      cookies: [],
+      origins: [
+        {
+          origin: 'http://127.0.0.1:4173',
+          localStorage: [{ name: 'breachscope.guide.v1', value: 'done' }],
+        },
+      ],
+    },
   },
   webServer: {
     command: 'npm run preview -- --host 127.0.0.1 --port 4173 --strictPort',

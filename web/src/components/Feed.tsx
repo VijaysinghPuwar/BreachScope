@@ -135,14 +135,6 @@ export function Feed({
             <span className="caption text-secondary">{counter.label}</span>
             <span className="metric">{counter.value}</span>
             {counter.window && <span className="caption text-tertiary">{counter.window}</span>}
-            {counter.label === 'Anomalies' && (
-              <span
-                className="caption text-tertiary"
-                title="Anomalies fire when z ≥ 6 and at least 20 events."
-              >
-                No anomalies in the last 14 days.
-              </span>
-            )}
           </div>
         ))}
       </div>

@@ -58,7 +58,7 @@ export function metrics(events: Observation[], now: number) {
   });
   return [
     {
-      label: 'Observations',
+      label: 'Scanning IPs',
       value: count(recent.length || observations.length),
       window: recent.length ? 'last 15m' : 'today',
     },
@@ -67,6 +67,6 @@ export function metrics(events: Observation[], now: number) {
       label: 'Countries',
       value: count(new Set(events.map((e) => e.country_code).filter(Boolean)).size),
     },
-    { label: 'Anomalies', value: '0' },
+    { label: 'Breaches', value: count(events.filter((e) => e.data_class === 'BRCH').length) },
   ];
 }

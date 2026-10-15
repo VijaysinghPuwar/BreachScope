@@ -1,4 +1,4 @@
-import { Bookmark, ChevronRight, History, MoreHorizontal, Radio, Search, X } from 'lucide-react';
+import { ChevronRight, FileText, History, MoreHorizontal, Radio, Search, X } from 'lucide-react';
 import type { DataClass, Observation } from '../data/events';
 import { navigation } from '../data/navigation';
 import { Button, Chip, Modal } from './ui';
@@ -39,18 +39,16 @@ export function ConsoleDialogs(p: {
           </a>
           <button
             type="button"
+            data-tour="timeline"
             aria-pressed={p.replay}
             onClick={() => (p.path === '/' ? p.onReplay(true) : window.location.assign('/'))}
           >
             <History />
             Replay
           </button>
-          <a
-            href="/investigations"
-            aria-current={p.path === '/investigations' ? 'page' : undefined}
-          >
-            <Bookmark />
-            Saved
+          <a href="/reports" aria-current={p.path === '/reports' ? 'page' : undefined}>
+            <FileText />
+            Reports
           </a>
           <button type="button" aria-expanded={p.moreOpen} onClick={() => p.onMore(true)}>
             <MoreHorizontal />
@@ -121,16 +119,12 @@ export function ConsoleDialogs(p: {
       </Modal>
       <Modal title="More" open={p.moreOpen} onOpenChange={p.onMore}>
         <nav className="more-navigation">
-          {navigation.slice(2).map(([name, href]) => (
+          {navigation.slice(1).map(([name, href]) => (
             <a key={href} href={href}>
               {name === 'About' ? 'About the data' : name}
               <ChevronRight />
             </a>
           ))}
-          <a href="/signin">
-            Account
-            <ChevronRight />
-          </a>
         </nav>
       </Modal>
     </>

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import {
   dataClasses,
@@ -21,6 +21,8 @@ import { ConsoleDialogs } from './components/ConsoleDialogs';
 import { Pages } from './components/Pages';
 import { Intro } from './components/Intro';
 import { ArrivalToast } from './components/ArrivalToast';
+import { Onboarding, type GuideState } from './components/Onboarding';
+import { guideSeen } from './lib/guide';
 
 const SpaceView = lazy(() => import('./space/SpaceView'));
 import { navigation } from './data/navigation';
@@ -75,6 +77,20 @@ export default function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [moreOpen, setMoreOpen] = useState(false);
+  // First visit: a short welcome once the map is up, with an optional tour.
+  // Until the visitor acts, the guide follows `firstVisit`; after that, their choice.
+  // A visitor who followed a link to one record came for that record.
+  const [firstVisit] = useState(
+    () => !guideSeen() && !new URLSearchParams(window.location.search).has('event'),
+  );
+  const [guideChoice, setGuide] = useState<GuideState | undefined>(undefined);
+  const guide =
+    guideChoice !== undefined ? guideChoice : firstVisit && mapActions && !space ? 'welcome' : null;
+  const counts = useMemo(() => {
+    const result: Partial<Record<DataClass, number>> = {};
+    for (const event of live.events) result[event.data_class] = (result[event.data_class] ?? 0) + 1;
+    return result;
+  }, [live.events]);
   const events = pausedEvents ?? live.events;
   const queued = pausedEvents
     ? live.events.filter((e) => !pausedEvents.some((p) => p.event_uid === e.event_uid)).length
@@ -89,6 +105,15 @@ export default function App() {
     [events, classes, search, playhead, replay],
   );
   const selection = visibleEvents.find((event) => event.event_uid === selected) ?? null;
+  // Reports link to `/?event=<uid>` so a row opens in the console.
+  const linkedEvent = useRef(new URLSearchParams(window.location.search).get('event'));
+  useEffect(() => {
+    const uid = linkedEvent.current;
+    if (!uid || !live.events.some((event) => event.event_uid === uid)) return;
+    linkedEvent.current = null;
+    setSelected(uid);
+    if (viewport.mobile) setSnap('full');
+  }, [live.events, viewport.mobile]);
   const toggleClass = (code: DataClass) =>
     setClasses((previous) =>
       previous.includes(code) ? previous.filter((value) => value !== code) : [...previous, code],
@@ -216,11 +241,14 @@ export default function App() {
   return (
     <TooltipPrimitive.Provider delayDuration={350}>
       <div className={`app ${viewport.mobile ? 'is-mobile' : ''} ${replay ? 'is-replay' : ''}`}>
-        <Intro
-          feedsLoaded={live.updatedAt !== null || live.error !== null}
-          mapReady={mapActions !== null || !isConsole || space || live.error !== null}
-          eventCount={live.events.length}
-        />
+        {/* Only the console waits for the map; text pages show their own skeletons. */}
+        {isConsole && (
+          <Intro
+            feedsLoaded={live.updatedAt !== null || live.error !== null}
+            mapReady={mapActions !== null || space || live.error !== null}
+            eventCount={live.events.length}
+          />
+        )}
         {space && (
           <div className="space-screen">
             <Suspense fallback={null}>
@@ -233,7 +261,8 @@ export default function App() {
             events={live.events}
             newIds={live.newIds}
             now={live.now}
-            enabled={mapActions !== null && !replay}
+            // Quiet while someone reads a record or the guide, so it never covers them.
+            enabled={mapActions !== null && !replay && !selection && guide === null}
             onSelect={selectEvent}
           />
         )}
@@ -254,6 +283,8 @@ export default function App() {
           status={status}
           sources={live.sources}
           now={live.now}
+          counts={counts}
+          onGuide={() => setGuide('tour')}
         />
         {useSample && (
           <div className="sample-banner" role="status">
@@ -293,10 +324,11 @@ export default function App() {
               snap={snap}
               onSnap={setSnap}
               closePanel={closePanel}
+              honeypot={live.sources.some((source) => source.data_class === 'telemetry')}
             />
             {!viewport.mobile && !replay && !timelineOpen && (
               <div className="timeline-toggle">
-                <Button variant="ghost" onClick={() => setTimelineOpen(true)}>
+                <Button variant="ghost" onClick={() => setTimelineOpen(true)} data-tour="timeline">
                   <ChevronUp aria-hidden="true" />
                   Show timeline
                 </Button>
@@ -316,7 +348,13 @@ export default function App() {
             )}
           </>
         ) : (
-          <Pages path={path} />
+          <Pages
+            path={path}
+            events={live.events}
+            sources={live.sources}
+            now={live.now}
+            loading={live.updatedAt === null && live.error === null}
+          />
         )}
         <ConsoleDialogs
           mobile={viewport.mobile}
@@ -335,6 +373,7 @@ export default function App() {
           onSelect={selectEvent}
           openFeed={openFeed}
         />
+        {isConsole && !space && <Onboarding state={guide} onState={setGuide} />}
         <div className="sr-only" role="status" aria-live="polite">
           {live.newIds.size > 0 ? `${live.newIds.size} new events` : ''}
         </div>

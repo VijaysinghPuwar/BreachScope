@@ -163,7 +163,7 @@ describe('live data contract', () => {
   it('counts DShield observations and falls back to today without fabricated deltas', () => {
     expect(metrics(events, now).map((m) => m.value)).toEqual(['2', '12', '6', '0']);
     expect(metrics(events, now + day)[0]).toEqual({
-      label: 'Observations',
+      label: 'Scanning IPs',
       value: '3',
       window: 'today',
     });

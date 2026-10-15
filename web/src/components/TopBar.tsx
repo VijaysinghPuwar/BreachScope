@@ -1,8 +1,8 @@
 import { Freshness } from './Freshness';
 import type { LiveSource } from '../data/live';
 import * as Dropdown from '@radix-ui/react-dropdown-menu';
-import { Check, ChevronDown, List, Menu, Search } from 'lucide-react';
-import { classNames, dataClasses, type DataClass } from '../data/events';
+import { Check, ChevronDown, CircleHelp, List, Menu, Search } from 'lucide-react';
+import { classNames, classShortNames, dataClasses, type DataClass } from '../data/events';
 import { ClassFilters } from './MapControls';
 import { Button, Chip, PopoverPanel, SegmentedControl, Tooltip } from './ui';
 import { navigation } from '../data/navigation';
@@ -23,10 +23,6 @@ export function NavigationMenu() {
               <a href={path}>{name}</a>
             </Dropdown.Item>
           ))}
-          <Dropdown.Separator className="menu-divider" />
-          <Dropdown.Item asChild>
-            <a href="/signin">Sign in</a>
-          </Dropdown.Item>
         </Dropdown.Content>
       </Dropdown.Portal>
     </Dropdown.Root>
@@ -46,6 +42,8 @@ export function TopBar({
   status,
   sources,
   now,
+  counts,
+  onGuide,
 }: {
   path: string;
   mobile: boolean;
@@ -60,6 +58,8 @@ export function TopBar({
   status: string;
   sources: LiveSource[];
   now: number;
+  counts: Partial<Record<DataClass, number>>;
+  onGuide(): void;
 }) {
   return (
     <header className="topbar">
@@ -92,15 +92,15 @@ export function TopBar({
               </div>
               {tablet ? (
                 <>
-                  <Button aria-label="Open feed" onClick={onFeed}>
+                  <Button aria-label="Open feed" onClick={onFeed} data-tour="feed">
                     <List />
                     Feed
                   </Button>
                   <PopoverPanel
                     label="Data classes"
                     trigger={
-                      <Button>
-                        Data {classes.length}/6
+                      <Button data-tour="filters">
+                        Data types {classes.filter((c) => c !== 'SIM').length}/5
                         <ChevronDown />
                       </Button>
                     }
@@ -109,20 +109,25 @@ export function TopBar({
                   </PopoverPanel>
                 </>
               ) : (
-                <div className="class-toggles" aria-label="Data classes">
-                  {dataClasses.map((code) => (
-                    <Tooltip key={code} content={classNames[code]}>
-                      <button
-                        className={`class-toggle ${classes.includes(code) ? 'on' : ''}`}
-                        type="button"
-                        aria-pressed={classes.includes(code)}
-                        onClick={() => onToggleClass(code)}
+                <div className="class-toggles" aria-label="Data types" data-tour="filters">
+                  {dataClasses
+                    .filter((code) => code !== 'SIM' || classes.includes('SIM'))
+                    .map((code) => (
+                      <Tooltip
+                        key={code}
+                        content={`${classNames[code]} (${code}) · ${(counts[code] ?? 0).toLocaleString('en-US')} records`}
                       >
-                        {classes.includes(code) && <Check />}
-                        {code}
-                      </button>
-                    </Tooltip>
-                  ))}
+                        <button
+                          className={`class-toggle ${classes.includes(code) ? 'on' : ''}`}
+                          type="button"
+                          aria-pressed={classes.includes(code)}
+                          onClick={() => onToggleClass(code)}
+                        >
+                          {classes.includes(code) && <Check />}
+                          {classShortNames[code]}
+                        </button>
+                      </Tooltip>
+                    ))}
                 </div>
               )}
             </>
@@ -135,15 +140,30 @@ export function TopBar({
             <span className="sim-label">Simulated data visible</span>
           </Chip>
         )}
-        <Button className="search-button" aria-label="Search events" onClick={onSearch}>
-          <Search />
-          <span className="search-placeholder">IP, ASN, CVE, country, malware</span>
-          <kbd>⌘K</kbd>
-        </Button>
-        {!mobile && (
-          <a href="/signin" className="button button-ghost signin-link">
-            Sign in
-          </a>
+        {path === '/' && (
+          <Button
+            className="search-button"
+            aria-label="Search events"
+            onClick={onSearch}
+            data-tour="search"
+          >
+            <Search />
+            <span className="search-placeholder">IP, ASN, CVE, country, malware</span>
+            <kbd>⌘K</kbd>
+          </Button>
+        )}
+        {path === '/' && (
+          <Button
+            variant="ghost"
+            className="guide-button"
+            iconOnly={mobile}
+            aria-label={mobile ? 'Open the guide' : undefined}
+            onClick={onGuide}
+            data-tour="guide"
+          >
+            <CircleHelp />
+            {!mobile && 'Guide'}
+          </Button>
         )}
       </div>
       <div className="feed-status">

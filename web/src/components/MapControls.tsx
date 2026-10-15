@@ -56,7 +56,7 @@ export function MapControls({
           className={mobile ? 'layers-mobile' : ''}
           label="Map layers"
           trigger={
-            <Button aria-label="Layers">
+            <Button aria-label="Layers" data-tour={mobile ? 'filters' : undefined}>
               <LayersIcon />
               <span className="layers-label">Layers</span>
             </Button>

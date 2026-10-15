@@ -5,7 +5,7 @@ import type { Observation, DataClass } from '../data/events';
 import type { Layers, MapActions, Projection } from '../map/types';
 import type { useViewport } from '../lib/useViewport';
 import type { LiveError } from '../lib/api';
-import { Banner, BottomSheet, Button, Chip, Drawer, Skeleton, type SnapPoint } from './ui';
+import { Banner, BottomSheet, Button, Chip, Drawer, Skeleton, Tooltip, type SnapPoint } from './ui';
 import { MapControls } from './MapControls';
 import { MapLegend } from './MapLegend';
 import { PerformanceHud } from './PerformanceHud';
@@ -41,6 +41,7 @@ export function ConsoleView(p: {
   snap: SnapPoint;
   onSnap(value: SnapPoint): void;
   closePanel(): void;
+  honeypot: boolean;
 }) {
   const { viewport, selection } = p;
   const collapsed = p.collapsed || (!!selection && viewport.width >= 1280 && viewport.width < 1300);
@@ -53,11 +54,16 @@ export function ConsoleView(p: {
       {!viewport.mobile && !viewport.tablet && (
         <aside className="desktop-feed" aria-label="Feed">
           {collapsed ? (
-            <div className="feed-rail">
-              <Button iconOnly aria-label="Open feed" onClick={p.openFeed}>
-                <List />
-              </Button>
-              <span className="rail-count mono">{p.events.length}</span>
+            <div className="feed-rail" data-tour="feed">
+              <Tooltip content={`Open the feed: ${p.events.length.toLocaleString('en-US')} events`}>
+                <Button iconOnly aria-label="Open feed" onClick={p.openFeed}>
+                  <List />
+                </Button>
+              </Tooltip>
+              <span className="rail-label caption" aria-hidden="true">
+                Feed
+              </span>
+              <span className="rail-count mono">{p.events.length.toLocaleString('en-US')}</span>
             </div>
           ) : (
             p.feed
@@ -67,6 +73,7 @@ export function ConsoleView(p: {
       <section
         className={`map-area ${viewport.tablet && selection && !viewport.portrait ? 'map-with-drawer' : ''}`}
         aria-label="Observation map"
+        data-tour="map"
       >
         <h1 className="sr-only">Live Console</h1>
         <MapErrorBoundary>
@@ -110,7 +117,7 @@ export function ConsoleView(p: {
           </div>
         )}
         {p.hud && <PerformanceHud />}
-        {!viewport.mobile && <MapLegend />}
+        {!viewport.mobile && <MapLegend honeypot={p.honeypot} />}
         <div className="map-attribution">
           DB-IP Lite (CC BY 4.0) · abuse.ch · SANS ISC DShield · CISA · Natural Earth · OpenFreeMap
           · © OpenStreetMap contributors
@@ -148,7 +155,12 @@ export function ConsoleView(p: {
           </Drawer>
         ))}
       {viewport.mobile && (
-        <BottomSheet snap={p.snap} onSnap={p.onSnap} label={selection ? 'Event detail' : 'Feed'}>
+        <BottomSheet
+          tour="feed"
+          snap={p.snap}
+          onSnap={p.onSnap}
+          label={selection ? 'Event detail' : 'Feed'}
+        >
           {p.panel ?? p.feed}
         </BottomSheet>
       )}

@@ -51,6 +51,15 @@ export const classNames: Record<DataClass, string> = {
   KEV: 'Known exploited vulnerability',
   BRCH: 'Breach report',
 };
+/** Plain words for the top bar filters, where a code would mean nothing to a new visitor. */
+export const classShortNames: Record<DataClass, string> = {
+  SIM: 'Simulated',
+  TEL: 'Honeypot',
+  AGG: 'Traffic stats',
+  IOC: 'Indicators',
+  KEV: 'Exploited CVEs',
+  BRCH: 'Breaches',
+};
 export const severityLabels = ['Info', 'Low', 'Medium', 'High', 'Critical'] as const;
 export const initialClasses = dataClasses.filter((value) => value !== 'SIM');
 export function utc(value: string): string {

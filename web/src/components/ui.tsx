@@ -322,7 +322,9 @@ export function BottomSheet({
   children,
   label,
   portrait = false,
+  tour,
 }: {
+  tour?: string;
   snap: SnapPoint;
   onSnap(value: SnapPoint): void;
   children: ReactNode;
@@ -336,6 +338,7 @@ export function BottomSheet({
     <section
       className={`bottom-sheet snap-${snap} ${portrait ? 'portrait-sheet' : ''}`}
       aria-label={label}
+      data-tour={tour}
     >
       <button
         className="sheet-handle"

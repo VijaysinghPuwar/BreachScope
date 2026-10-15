@@ -780,6 +780,11 @@ select {
   gap: 16px;
   padding-top: 12px;
 }
+.rail-label {
+  writing-mode: vertical-rl;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+}
 .rail-count {
   writing-mode: vertical-rl;
   color: var(--text-tertiary);
@@ -1530,33 +1535,10 @@ select {
   font-weight: 500;
   background: var(--bg-raised);
 }
-.signin-page,
 .not-found {
   display: grid;
   place-items: center;
   padding: 16px;
-}
-.signin-card {
-  width: 360px;
-  max-width: 100%;
-  padding: 32px;
-  border: 1px solid var(--border-default);
-  border-radius: 8px;
-  background: var(--bg-panel);
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 24px;
-}
-.signin-card h1 {
-  font-size: 16px;
-}
-.signin-card > .button {
-  width: 100%;
-}
-.signin-card > a:last-child {
-  font-size: 12px;
 }
 .not-found > div {
   max-width: 440px;
@@ -1997,14 +1979,6 @@ select {
     align-items: center;
     min-height: 44px;
   }
-  .signin-card {
-    padding: 24px;
-  }
-  .signin-card > a:last-child {
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-  }
   .about-classes > div {
     gap: 12px;
   }
@@ -2203,4 +2177,274 @@ select {
   inset: 0;
   z-index: 60;
   background: var(--bg-base);
+}
+
+/* First-visit guide */
+.welcome {
+  position: fixed;
+  z-index: 50;
+  left: calc(var(--rail-w) + 16px);
+  top: calc(var(--topbar-h) + 44px);
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-popover);
+}
+.welcome h2 {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+  padding-right: 32px;
+}
+/* The heading takes focus only so screen readers announce each step; it is
+   not a control, so it gets no focus ring. */
+.tour-card h2:focus-visible {
+  outline: none !important;
+}
+.welcome > p {
+  line-height: 20px;
+}
+.welcome-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+.welcome-points {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.welcome-points li {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: 10px;
+  line-height: 20px;
+}
+.welcome-points svg {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  color: var(--accent);
+}
+.welcome-actions,
+.tour-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.tour-actions {
+  justify-content: flex-end;
+}
+.tour-spotlight {
+  position: fixed;
+  z-index: 49;
+  border: 2px solid var(--accent);
+  border-radius: var(--radius-panel);
+  /* Dims everything but the target so the eye lands on it. */
+  box-shadow: 0 0 0 9999px rgba(14, 16, 19, 0.55);
+  pointer-events: none;
+  transition:
+    top var(--duration-panel) var(--ease-standard),
+    left var(--duration-panel) var(--ease-standard),
+    width var(--duration-panel) var(--ease-standard),
+    height var(--duration-panel) var(--ease-standard);
+}
+.tour-card {
+  position: fixed;
+  z-index: 50;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-popover);
+  transition:
+    top var(--duration-panel) var(--ease-standard),
+    left var(--duration-panel) var(--ease-standard);
+}
+.tour-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -4px -4px 0 0;
+}
+.tour-card h2 {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.tour-card p {
+  color: var(--text-secondary);
+  line-height: 20px;
+}
+@media (max-width: 767px) {
+  .welcome {
+    left: 16px;
+    right: 16px;
+    width: auto;
+    top: calc(var(--topbar-h) + 40px);
+    max-height: calc(100dvh - var(--topbar-h) - 40px - var(--tabbar-h) - 24px);
+    overflow: auto;
+  }
+  .welcome-actions {
+    flex-direction: column;
+  }
+  .welcome-actions .button {
+    width: 100%;
+    justify-content: center;
+    min-height: var(--touch-target);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tour-spotlight,
+  .tour-card {
+    transition: none;
+  }
+}
+
+/* How it works */
+.flow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 16px 0;
+  counter-reset: flow;
+}
+.flow li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-secondary);
+}
+.flow li strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.flow li:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 22px;
+  right: -8px;
+  width: 8px;
+  border-top: 1px solid var(--border-strong);
+}
+.flow-step {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+@media (max-width: 767px) {
+  .flow {
+    grid-template-columns: 1fr;
+  }
+  .flow li:not(:last-child)::after {
+    top: auto;
+    bottom: -8px;
+    right: auto;
+    left: 22px;
+    width: 0;
+    height: 8px;
+    border-top: 0;
+    border-left: 1px solid var(--border-strong);
+  }
+}
+
+/* Reports and Status */
+.page-wide {
+  max-width: 1200px;
+}
+.page-wide > h1 {
+  margin-bottom: 8px;
+}
+.page-lede {
+  max-width: 720px;
+  margin-bottom: 20px;
+  line-height: 20px;
+}
+.page-wide > .segmented {
+  margin-bottom: 16px;
+}
+.page-wide > .source-table + .banner {
+  margin-top: 16px;
+}
+.table-skeleton {
+  height: 320px;
+  border-radius: var(--radius-panel);
+}
+.report-table td {
+  vertical-align: top;
+}
+.report-table td.mono {
+  white-space: nowrap;
+}
+.row-links {
+  white-space: nowrap;
+}
+.row-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 12px;
+}
+.row-link svg {
+  width: 12px;
+  height: 12px;
+}
+.status-summary {
+  margin-bottom: 12px;
+  color: var(--text-secondary);
+}
+.status-summary strong {
+  color: var(--text-primary);
+}
+.state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.state::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+}
+.state[data-state='stale']::before {
+  background: var(--warning);
+  border-radius: 0;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+.state[data-state='error']::before {
+  background: var(--danger);
+  border-radius: 1px;
+}
+.state-error {
+  display: block;
+  max-width: 280px;
+}
+/* A link inside running text needs more than colour to stand out. */
+.prose p a,
+.prose li a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }

@@ -45,9 +45,13 @@ export function ArrivalToast({
   const [pulseKey, setPulseKey] = useState(0);
   const [hovered, setHovered] = useState(false);
   const announcedFirst = useRef(false);
+  // The poll whose arrivals were last considered, so re-enabling the toast
+  // does not announce the same poll twice.
+  const seenPoll = useRef<Set<string> | null>(null);
 
   useEffect(() => {
-    if (!enabled || events.length === 0) return;
+    if (!enabled || events.length === 0 || seenPoll.current === newIds) return;
+    seenPoll.current = newIds;
     const byTime = (a: Observation, b: Observation) =>
       Date.parse(eventTime(b)) - Date.parse(eventTime(a));
     let arrivals: Observation[];
@@ -70,10 +74,11 @@ export function ArrivalToast({
     return () => clearTimeout(timer);
   }, [current, hovered]);
 
+  const shown = enabled ? current : null;
   return (
     <>
       {pulseKey > 0 && <div key={pulseKey} className="global-pulse" aria-hidden="true" />}
-      {current && (
+      {shown && (
         <div
           className="arrival-toast"
           role="status"
@@ -85,20 +90,18 @@ export function ArrivalToast({
             type="button"
             className="arrival-body"
             onClick={() => {
-              onSelect(current.event);
+              onSelect(shown.event);
               setCurrent(null);
             }}
           >
             <span className="arrival-title">
-              <SeverityGlyph level={current.event.severity} compact />
-              {current.event.data_class === 'BRCH'
-                ? 'New breach disclosed'
-                : current.event.category}
+              <SeverityGlyph level={shown.event.severity} compact />
+              {shown.event.data_class === 'BRCH' ? 'New breach disclosed' : shown.event.category}
             </span>
-            <span className="arrival-subject">{subject(current.event)}</span>
+            <span className="arrival-subject">{subject(shown.event)}</span>
             <span className="arrival-meta">
-              {current.event.source} · {relativeTime(eventTime(current.event), now)}
-              {current.more > 0 && ` · +${current.more} more`}
+              {shown.event.source} · {relativeTime(eventTime(shown.event), now)}
+              {shown.more > 0 && ` · +${shown.more} more`}
             </span>
           </button>
           <button
